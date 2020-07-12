@@ -19,7 +19,7 @@ fn deserialize_es256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key_type: box KeyType::EC {
+            key: box Key::EC {
                 // The parameters were decoded using a 10-liner Rust script.
                 params: Curve::P256 {
                     d: Some(
@@ -53,7 +53,7 @@ fn deserialize_es256() {
 #[test]
 fn serialize_es256() {
     let jwk = JsonWebKey {
-        key_type: box KeyType::EC {
+        key: box Key::EC {
             params: Curve::P256 {
                 d: None,
                 x: [1u8; 32].into(),
@@ -83,7 +83,7 @@ fn deserialize_hs256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key_type: box KeyType::Symmetric {
+            key: box Key::Symmetric {
                 // The parameters were decoded using a 10-liner Rust script.
                 key: vec![180, 3, 141, 233].into(),
             },
@@ -98,7 +98,7 @@ fn deserialize_hs256() {
 #[test]
 fn serialize_hs256() {
     let jwk = JsonWebKey {
-        key_type: box KeyType::Symmetric {
+        key: box Key::Symmetric {
             key: vec![42; 16].into(),
         },
         key_id: None,
@@ -130,7 +130,7 @@ fn deserialize_rs256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key_type: box KeyType::RSA {
+            key: box Key::RSA {
                 public: RsaPublic {
                     e: PublicExponent,
                     n: vec![
@@ -201,7 +201,7 @@ fn deserialize_rs256() {
 #[test]
 fn serialize_rs256() {
     let jwk = JsonWebKey {
-        key_type: box KeyType::RSA {
+        key: box Key::RSA {
             public: RsaPublic {
                 e: PublicExponent,
                 n: vec![105, 183, 62].into(),
@@ -259,5 +259,27 @@ fn mismatched_algorithm() {
             "y": "TjYZoHnctatEE6NCrKmXQdJJPnNzZEX8nBmZde3AY4k",
             "alg": "HS256"
         }"#
+    );
+}
+
+#[cfg(feature = "conversion")]
+#[test]
+fn es256_to_pem() {
+    let jwk_str = r#"{
+        "kty": "EC",
+        "d": "ZoKQ9j4dhIBlMRVrv-QG8P_T9sutv3_95eio9MtpgKg",
+        "crv": "P-256",
+        "x": "QOMHmv96tVlJv-uNqprnDSKIj5AiLTXKRomXYnav0N0",
+        "y": "TjYZoHnctatEE6NCrKmXQdJJPnNzZEX8nBmZde3AY4k"
+    }"#;
+    let jwk = JsonWebKey::from_str(jwk_str).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        base64::encode(jwk.key.to_pem().unwrap()),
+"-----BEGIN PRIVATE KEY-----
+MHcCAQEEIGaCkPY+HYSAZTEVa7/kBvD/0/bLrb9//eXoqPTLaYCooAoGCCqGSM49
+AwEHoUQDQgAEQOMHmv96tVlJv+uNqprnDSKIj5AiLTXKRomXYnav0N1ONhmgedy1
+q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
+-----END PRIVATE KEY-----"
     );
 }

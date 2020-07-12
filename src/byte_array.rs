@@ -9,7 +9,7 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::utils::{deserialize_base64, serialize_base64};
 
-#[derive(Zeroize, Deref, AsRef, From)]
+#[derive(Clone, Zeroize, Deref, AsRef, From)]
 #[zeroize(drop)]
 pub struct ByteArray<const N: usize>(pub [u8; N]);
 

@@ -9,7 +9,7 @@ use zeroize::Zeroize;
 
 use crate::utils::{deserialize_base64, serialize_base64};
 
-#[derive(PartialEq, Eq, Zeroize, Deref, AsRef, From)]
+#[derive(Clone, PartialEq, Eq, Zeroize, Deref, AsRef, From)]
 #[zeroize(drop)]
 pub struct ByteVec(pub Vec<u8>);
 

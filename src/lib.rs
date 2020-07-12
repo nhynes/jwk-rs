@@ -18,7 +18,7 @@ pub use key_ops::KeyOps;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JsonWebKey {
     #[serde(flatten)]
-    pub key_type: Box<KeyType>,
+    pub key: Box<Key>,
 
     #[serde(default, rename = "use", skip_serializing_if = "Option::is_none")]
     pub key_use: Option<KeyUse>,
@@ -46,12 +46,12 @@ impl std::str::FromStr for JsonWebKey {
 
         // Validate alg.
         use JsonWebAlgorithm::*;
-        use KeyType::*;
+        use Key::*;
         let alg = match &jwk.algorithm {
             Some(alg) => alg,
             None => return Ok(jwk),
         };
-        match (alg, &*jwk.key_type) {
+        match (alg, &*jwk.key) {
             (
                 ES256,
                 EC {
@@ -75,9 +75,9 @@ impl std::fmt::Display for JsonWebKey {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kty")]
-pub enum KeyType {
+pub enum Key {
     EC {
         #[serde(flatten)]
         params: Curve,
@@ -95,7 +95,188 @@ pub enum KeyType {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+impl Key {
+    /// Returns true iff this key only contains private components (i.e. a private asymmetric
+    /// key or a symmetric key).
+    fn is_private(&self) -> bool {
+        match self {
+            Self::Symmetric { .. }
+            | Self::EC {
+                params: Curve::P256 { d: Some(_), .. },
+                ..
+            }
+            | Self::RSA {
+                private: Some(_), ..
+            } => true,
+            _ => false,
+        }
+    }
+
+    /// Returns true iff this key only contains non-private components.
+    pub fn is_public(&self) -> bool {
+        !self.is_private()
+    }
+
+    /// Returns the public part of this key, if it's symmetric.
+    pub fn to_public(&self) -> Option<Self> {
+        if self.is_public() {
+            return Some(self.clone());
+        }
+        Some(match self {
+            Self::Symmetric { .. } => return None,
+            Self::EC {
+                params: Curve::P256 { x, y, .. },
+            } => Self::EC {
+                params: Curve::P256 {
+                    x: x.clone(),
+                    y: y.clone(),
+                    d: None,
+                },
+            },
+            Self::RSA { public, .. } => Self::RSA {
+                public: public.clone(),
+                private: None,
+            },
+        })
+    }
+
+    /// If this key is asymmetric, encodes it as PKCS#8.
+    #[cfg(feature = "conversion")]
+    pub fn to_der(&self) -> Option<Vec<u8>> {
+        use yasna::{models::ObjectIdentifier, DERWriter, DERWriterSeq, Tag};
+
+        if let Self::Symmetric { .. } = self {
+            return None;
+        }
+        Some(yasna::construct_der(|writer| match self {
+            Self::EC {
+                params: Curve::P256 { d, x, y },
+            } => {
+                let write_curve_oid = |writer: DERWriter| {
+                    writer.write_oid(&ObjectIdentifier::from_slice(&[
+                        1, 2, 840, 10045, 3, 1, 7, // prime256v1
+                    ]));
+                };
+                let write_public = |writer: DERWriter| {
+                    let public_bytes: Vec<u8> = [0x04 /* uncompressed */]
+                        .iter()
+                        .chain(x.iter())
+                        .chain(y.iter())
+                        .copied()
+                        .collect();
+                    writer.write_bitvec_bytes(&public_bytes, 8 * (32 * 2 + 1));
+                };
+                writer.write_sequence(|writer| {
+                    match d {
+                        Some(private_point) => {
+                            writer.next().write_i8(1); // version
+                            writer.next().write_bytes(private_point.as_ref());
+                            writer.next().write_tagged(Tag::context(0), |writer| {
+                                write_curve_oid(writer);
+                            });
+                            writer.next().write_tagged(Tag::context(1), |writer| {
+                                write_public(writer);
+                            });
+                        }
+                        None => {
+                            writer.next().write_sequence(|writer| {
+                                writer.next().write_oid(&ObjectIdentifier::from_slice(&[
+                                    1, 2, 840, 10045, 2, 1, // ecPublicKey
+                                ]));
+                                write_curve_oid(writer.next());
+                            });
+                            write_public(writer.next());
+                        }
+                    };
+                });
+            }
+            Self::RSA { public, private } => {
+                let write_alg_id = |writer: &mut DERWriterSeq| {
+                    writer.next().write_oid(&ObjectIdentifier::from_slice(&[
+                        1, 2, 840, 113549, 1, 1, 1, // rsaEncryption
+                    ]));
+                    writer.next().write_null(); // parameters
+                };
+                let write_public = |writer: &mut DERWriterSeq| {
+                    writer.next().write_bytes(&*public.n);
+                    writer.next().write_u32(PUBLIC_EXPONENT);
+                };
+                writer.write_sequence(|writer| {
+                    match private {
+                        Some(private) => {
+                            writer.next().write_i8(0); // version
+                            writer.next().write_sequence(|writer| {
+                                write_alg_id(writer);
+                            });
+                            writer
+                                .next()
+                                .write_tagged(yasna::tags::TAG_OCTETSTRING, |writer| {
+                                    writer.write_sequence(|writer| {
+                                        writer.next().write_i8(0); // version
+                                        write_public(writer);
+                                        writer.next().write_bytes(&private.d);
+                                        if let Some(p) = &private.p {
+                                            writer.next().write_bytes(p);
+                                        }
+                                        if let Some(q) = &private.q {
+                                            writer.next().write_bytes(q);
+                                        }
+                                        if let Some(dp) = &private.dp {
+                                            writer.next().write_bytes(dp);
+                                        }
+                                        if let Some(dq) = &private.dq {
+                                            writer.next().write_bytes(dq);
+                                        }
+                                        if let Some(qi) = &private.qi {
+                                            writer.next().write_bytes(qi);
+                                        }
+                                    });
+                                });
+                        }
+                        None => {
+                            write_alg_id(writer);
+                            writer
+                                .next()
+                                .write_tagged(yasna::tags::TAG_BITSTRING, |writer| {
+                                    writer.write_sequence(|writer| {
+                                        write_public(writer);
+                                    })
+                                });
+                        }
+                    }
+                });
+            }
+            Self::Symmetric { .. } => unreachable!("checked above"),
+        }))
+    }
+
+    /// If this key is asymmetric, encodes it as PKCS#8 with PEM armoring.
+    #[cfg(feature = "conversion")]
+    pub fn to_pem(&self) -> Option<String> {
+        use std::fmt::Write;
+        let der_b64 = base64::encode(self.to_der()?);
+        let key_ty = if self.is_private() {
+            "PRIVATE"
+        } else {
+            "PUBLIC"
+        };
+        let mut pem = String::new();
+        writeln!(&mut pem, "-----BEGIN {} KEY-----", key_ty).unwrap();
+        const MAX_LINE_LEN: usize = 64;
+        for i in (0..der_b64.len()).step_by(MAX_LINE_LEN) {
+            writeln!(
+                &mut pem,
+                "{}",
+                &der_b64[i..std::cmp::min(i + MAX_LINE_LEN, der_b64.len())]
+            )
+            .unwrap();
+        }
+        writeln!(&mut pem, "-----END {} KEY-----", key_ty).unwrap();
+        Some(pem)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "crv")]
 pub enum Curve {
     /// prime256v1
@@ -109,7 +290,7 @@ pub enum Curve {
     },
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RsaPublic {
     /// Public exponent. Must be 65537.
     pub e: PublicExponent,
@@ -120,7 +301,7 @@ pub struct RsaPublic {
 const PUBLIC_EXPONENT: u32 = 65537;
 const PUBLIC_EXPONENT_B64: &str = "AQAB"; // little-endian, strip zeros
 const PUBLIC_EXPONENT_B64_PADDED: &str = "AQABAA==";
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublicExponent;
 
 impl Serialize for PublicExponent {
@@ -143,7 +324,7 @@ impl<'de> Deserialize<'de> for PublicExponent {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RsaPrivate {
     /// Private exponent.
     pub d: ByteVec,
