@@ -35,3 +35,8 @@ fn main() {
     let token = jwt::encode(&jwt::Header::default(), &() /* claims */, encoding_key).unwrap();
 }
 ```
+
+## Features
+
+* `convert` - enables `Key::{to_der, to_pem}`.
+              This pulls in the [yasna](https://crates.io/crates/yasna) crate.

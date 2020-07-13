@@ -2,10 +2,8 @@ use super::*;
 
 use std::str::FromStr;
 
-#[test]
-fn deserialize_es256() {
-    // Generated using https://mkjwk.org
-    let jwk_str = r#"{
+// Generated using https://mkjwk.org
+static P256_JWK_FIXTURE: &str = r#"{
         "kty": "EC",
         "d": "ZoKQ9j4dhIBlMRVrv-QG8P_T9sutv3_95eio9MtpgKg",
         "use": "enc",
@@ -15,13 +13,29 @@ fn deserialize_es256() {
         "y": "TjYZoHnctatEE6NCrKmXQdJJPnNzZEX8nBmZde3AY4k",
         "alg": "ES256"
     }"#;
-    let jwk = JsonWebKey::from_str(jwk_str).unwrap();
+
+static RSA_JWK_FIXTURE: &str = r#"{
+        "p": "6AQ4yHef17an_i5LQPHNIxzpH65xWOSf_qCB7q-lXyM",
+        "kty": "RSA",
+        "q": "tSVfpefCsf1iWmAs1zYvxdEsUiv0VMEuQBtbTijj_OE",
+        "d": "Qdp8a8Df5TlMaaloXApNF_3eu8sLHNWbXdg70e5YVTAs0WUfaIf5c3n96RrDDAzmMEwgKnJ7A1NJ9Nlzz4Z0AQ",
+        "e": "AQAB",
+        "use": "enc",
+        "qi": "adhQHH8IGXFfLEMnZ5t_TeCp5zgSwQktJ2lmylxUG0M",
+        "dp": "qVnLiKeoSG_Olz17OGBGd4a2sqVFnrjh_51wuaQDdTk",
+        "dq": "GL_Ec6xYg2z1FRfyyGyU1lgf0BJFTZcfNI8ISIN5ssE",
+        "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
+    }"#;
+
+#[test]
+fn deserialize_es256() {
+    let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
     assert_eq!(
         jwk,
         JsonWebKey {
             key: box Key::EC {
                 // The parameters were decoded using a 10-liner Rust script.
-                params: Curve::P256 {
+                curve: Curve::P256 {
                     d: Some(
                         [
                             102, 130, 144, 246, 62, 29, 132, 128, 101, 49, 21, 107, 191, 228, 6,
@@ -54,7 +68,7 @@ fn deserialize_es256() {
 fn serialize_es256() {
     let jwk = JsonWebKey {
         key: box Key::EC {
-            params: Curve::P256 {
+            curve: Curve::P256 {
                 d: None,
                 x: [1u8; 32].into(),
                 y: [2u8; 32].into(),
@@ -114,19 +128,7 @@ fn serialize_hs256() {
 
 #[test]
 fn deserialize_rs256() {
-    let jwk_str = r#"{
-        "p": "_LSip5o4eaGf25uvwyUq9ubRtKemrCaoCxumoj63Au0",
-        "kty": "RSA",
-        "q": "l20iLpicEW3uja0Zg2xP6DjZa86bD4IQ3wFXCcKCf1c",
-        "d": "Xo0VAHtfV38HwJbAI6X-Fu7vuyoQjnuiSlQhcSjxn0BZfLP_DKxdJ2ANgTGVE0x243YHqhWRHLobbmDcnUuMOQ",
-        "e": "AQAB",
-        "qi": "2mzAaSr7I1D3vDtOhbWKS9-9ELRHKbAHz4dhn4DSCBo",
-        "dp": "-kyswxeVEpyM6wdU2xRobu-HDMn145PSZFY6AX_e460",
-        "alg": "RS256",
-        "dq": "OqMWE3khJlatg8s-D_hHUSOCfg65WN4C7ng0XiEmK20",
-        "n": "lXpGmBoIxj56TpptApaac6V19_7WWbq0a14a5UHBBlkc54NwIUa2X4p9OeK2sy6rLQ_1g1AcSwfsVUy8MP-Riw"
-    }"#;
-    let jwk = JsonWebKey::from_str(jwk_str).unwrap();
+    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
     assert_eq!(
         jwk,
         JsonWebKey {
@@ -262,24 +264,71 @@ fn mismatched_algorithm() {
     );
 }
 
-#[cfg(feature = "conversion")]
+#[cfg(feature = "convert")]
 #[test]
-fn es256_to_pem() {
-    let jwk_str = r#"{
-        "kty": "EC",
-        "d": "ZoKQ9j4dhIBlMRVrv-QG8P_T9sutv3_95eio9MtpgKg",
-        "crv": "P-256",
-        "x": "QOMHmv96tVlJv-uNqprnDSKIj5AiLTXKRomXYnav0N0",
-        "y": "TjYZoHnctatEE6NCrKmXQdJJPnNzZEX8nBmZde3AY4k"
-    }"#;
-    let jwk = JsonWebKey::from_str(jwk_str).unwrap();
+fn p256_private_to_pem() {
+    // generated using mkjwk, converted using node-jwk-to-pem, verified using openssl
+    let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
-        base64::encode(jwk.key.to_pem().unwrap()),
+        jwk.key.to_pem().unwrap(),
 "-----BEGIN PRIVATE KEY-----
-MHcCAQEEIGaCkPY+HYSAZTEVa7/kBvD/0/bLrb9//eXoqPTLaYCooAoGCCqGSM49
-AwEHoUQDQgAEQOMHmv96tVlJv+uNqprnDSKIj5AiLTXKRomXYnav0N1ONhmgedy1
-q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
------END PRIVATE KEY-----"
+MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgZoKQ9j4dhIBlMRVr
+v+QG8P/T9sutv3/95eio9MtpgKigCgYIKoZIzj0DAQehRANCAARA4wea/3q1WUm/
+642qmucNIoiPkCItNcpGiZdidq/Q3U42GaB53LWrRBOjQqypl0HSST5zc2RF/JwZ
+mXXtwGOJ
+-----END PRIVATE KEY-----
+"
+    );
+}
+
+#[cfg(feature = "convert")]
+#[test]
+fn p256_public_to_pem() {
+    let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        jwk.key.to_public().unwrap().to_pem().unwrap(),
+"-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQOMHmv96tVlJv+uNqprnDSKIj5Ai
+LTXKRomXYnav0N1ONhmgedy1q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
+-----END PUBLIC KEY-----
+"
+    );
+}
+
+#[cfg(feature = "convert")]
+#[test]
+fn rsa_private_to_pem() {
+    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        jwk.key.to_pem().unwrap(),
+"-----BEGIN PRIVATE KEY-----
+MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEApCzbcd9kjvg5rfGH
+dEMWnXo49zbB6FLQ+m0B0BvVp0aojVWYa0xujC+ZP7ZhxByPxyc2PazwFJJi9ivZ
+/ggRwwIDAQABAkBB2nxrwN/lOUxpqWhcCk0X/d67ywsc1Ztd2DvR7lhVMCzRZR9o
+h/lzef3pGsMMDOYwTCAqcnsDU0n02XPPhnQBAiEA6AQ4yHef17an/i5LQPHNIxzp
+H65xWOSf/qCB7q+lXyMCIQC1JV+l58Kx/WJaYCzXNi/F0SxSK/RUwS5AG1tOKOP8
+4QIhAKlZy4inqEhvzpc9ezhgRneGtrKlRZ644f+dcLmkA3U5AiAYv8RzrFiDbPUV
+F/LIbJTWWB/QEkVNlx80jwhIg3mywQIgadhQHH8IGXFfLEMnZ5t/TeCp5zgSwQkt
+J2lmylxUG0M=
+-----END PRIVATE KEY-----
+"
+    );
+}
+
+#[cfg(feature = "convert")]
+#[test]
+fn rsa_public_to_pem() {
+    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        jwk.key.to_public().unwrap().to_pem().unwrap(),
+"-----BEGIN PUBLIC KEY-----
+MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKQs23HfZI74Oa3xh3RDFp16OPc2wehS
+0PptAdAb1adGqI1VmGtMbowvmT+2YcQcj8cnNj2s8BSSYvYr2f4IEcMCAwEAAQ==
+-----END PUBLIC KEY-----
+"
     );
 }

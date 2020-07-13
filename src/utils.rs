@@ -30,3 +30,53 @@ pub fn deserialize_base64<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D:
         de::Error::custom(err_msg.strip_suffix(".").unwrap_or(&err_msg))
     })
 }
+
+#[cfg(feature = "convert")]
+pub mod pkcs8 {
+    use yasna::{
+        models::{ObjectIdentifier, TaggedDerValue},
+        DERWriter, DERWriterSeq,
+    };
+
+    fn write_oids(writer: &mut DERWriterSeq, oids: &[Option<&ObjectIdentifier>]) {
+        for oid in oids {
+            match oid {
+                Some(oid) => writer.next().write_oid(oid),
+                None => writer.next().write_null(),
+            }
+        }
+    }
+
+    pub fn write_private(
+        oids: &[Option<&ObjectIdentifier>],
+        body_writer: impl FnOnce(&mut DERWriterSeq),
+    ) -> Vec<u8> {
+        yasna::construct_der(|writer| {
+            writer.write_sequence(|writer| {
+                writer.next().write_i8(0); // version
+                writer
+                    .next()
+                    .write_sequence(|writer| write_oids(writer, oids));
+
+                let body = yasna::construct_der(|writer| writer.write_sequence(body_writer));
+                writer
+                    .next()
+                    .write_tagged_der(&TaggedDerValue::from_octetstring(body));
+            })
+        })
+    }
+
+    pub fn write_public(
+        oids: &[Option<&ObjectIdentifier>],
+        body_writer: impl FnOnce(DERWriter),
+    ) -> Vec<u8> {
+        yasna::construct_der(|writer| {
+            writer.write_sequence(|writer| {
+                writer
+                    .next()
+                    .write_sequence(|writer| write_oids(writer, oids));
+                body_writer(writer.next());
+            })
+        })
+    }
+}
