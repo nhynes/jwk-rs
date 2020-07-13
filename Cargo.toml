@@ -14,7 +14,9 @@ bitflags = "1.2"
 derive_more = "0.99"
 jsonwebtoken = { version = "7.2", optional = true }
 num-bigint = { version = "0.2", optional = true }
+p256 = { version = "0.3", optional = true }
 paste = "0.1"
+rand = { version = "0.7", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 syn = { version = "1.0", features = ["full"] } # required to parse const generics
@@ -24,6 +26,7 @@ zeroize = { version = "1.1", features = ["zeroize_derive"] }
 
 [features]
 convert = ["num-bigint", "yasna"]
+generate = ["p256", "rand"]
 
 [dev-dependencies]
 jsonwebtoken = "7.2"

@@ -85,6 +85,32 @@ fn serialize_es256() {
     );
 }
 
+#[cfg(feature = "generate")]
+#[test]
+fn generate_p256() {
+    extern crate jsonwebtoken as jwt;
+
+    #[derive(Serialize, Deserialize)]
+    struct TokenClaims {}
+
+    let mut the_jwk = JsonWebKey::new(Key::generate_p256());
+    the_jwk.set_algorithm(JsonWebAlgorithm::ES256).unwrap();
+
+    let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der().unwrap());
+    let token = jwt::encode(
+        &jwt::Header::new(the_jwk.algorithm.unwrap().into()),
+        &TokenClaims {},
+        &encoding_key,
+    )
+    .unwrap();
+
+    let mut validation = jwt::Validation::new(the_jwk.algorithm.unwrap().into());
+    validation.validate_exp = false;
+    let public_pem = the_jwk.key.to_public().unwrap().to_pem().unwrap();
+    let decoding_key = jwt::DecodingKey::from_ec_pem(public_pem.as_bytes()).unwrap();
+    jwt::decode::<TokenClaims>(&token, &decoding_key, &validation).unwrap();
+}
+
 #[test]
 fn deserialize_hs256() {
     let jwk_str = r#"{
@@ -136,66 +162,65 @@ fn deserialize_rs256() {
                 public: RsaPublic {
                     e: PublicExponent,
                     n: vec![
-                        149, 122, 70, 152, 26, 8, 198, 62, 122, 78, 154, 109, 2, 150, 154, 115,
-                        165, 117, 247, 254, 214, 89, 186, 180, 107, 94, 26, 229, 65, 193, 6, 89,
-                        28, 231, 131, 112, 33, 70, 182, 95, 138, 125, 57, 226, 182, 179, 46, 171,
-                        45, 15, 245, 131, 80, 28, 75, 7, 236, 85, 76, 188, 48, 255, 145, 139
+                        164, 44, 219, 113, 223, 100, 142, 248, 57, 173, 241, 135, 116, 67, 22, 157,
+                        122, 56, 247, 54, 193, 232, 82, 208, 250, 109, 1, 208, 27, 213, 167, 70,
+                        168, 141, 85, 152, 107, 76, 110, 140, 47, 153, 63, 182, 97, 196, 28, 143,
+                        199, 39, 54, 61, 172, 240, 20, 146, 98, 246, 43, 217, 254, 8, 17, 195
                     ]
                     .into()
                 },
                 private: Some(RsaPrivate {
                     d: vec![
-                        94, 141, 21, 0, 123, 95, 87, 127, 7, 192, 150, 192, 35, 165, 254, 22, 238,
-                        239, 187, 42, 16, 142, 123, 162, 74, 84, 33, 113, 40, 241, 159, 64, 89,
-                        124, 179, 255, 12, 172, 93, 39, 96, 13, 129, 49, 149, 19, 76, 118, 227,
-                        118, 7, 170, 21, 145, 28, 186, 27, 110, 96, 220, 157, 75, 140, 57
+                        65, 218, 124, 107, 192, 223, 229, 57, 76, 105, 169, 104, 92, 10, 77, 23,
+                        253, 222, 187, 203, 11, 28, 213, 155, 93, 216, 59, 209, 238, 88, 85, 48,
+                        44, 209, 101, 31, 104, 135, 249, 115, 121, 253, 233, 26, 195, 12, 12, 230,
+                        48, 76, 32, 42, 114, 123, 3, 83, 73, 244, 217, 115, 207, 134, 116, 1
                     ]
                     .into(),
                     p: Some(
                         vec![
-                            252, 180, 162, 167, 154, 56, 121, 161, 159, 219, 155, 175, 195, 37, 42,
-                            246, 230, 209, 180, 167, 166, 172, 38, 168, 11, 27, 166, 162, 62, 183,
-                            2, 237
+                            232, 4, 56, 200, 119, 159, 215, 182, 167, 254, 46, 75, 64, 241, 205,
+                            35, 28, 233, 31, 174, 113, 88, 228, 159, 254, 160, 129, 238, 175, 165,
+                            95, 35
                         ]
                         .into()
                     ),
                     q: Some(
                         vec![
-                            151, 109, 34, 46, 152, 156, 17, 109, 238, 141, 173, 25, 131, 108, 79,
-                            232, 56, 217, 107, 206, 155, 15, 130, 16, 223, 1, 87, 9, 194, 130, 127,
-                            87
+                            181, 37, 95, 165, 231, 194, 177, 253, 98, 90, 96, 44, 215, 54, 47, 197,
+                            209, 44, 82, 43, 244, 84, 193, 46, 64, 27, 91, 78, 40, 227, 252, 225
                         ]
                         .into()
                     ),
                     dp: Some(
                         vec![
-                            250, 76, 172, 195, 23, 149, 18, 156, 140, 235, 7, 84, 219, 20, 104,
-                            110, 239, 135, 12, 201, 245, 227, 147, 210, 100, 86, 58, 1, 127, 222,
-                            227, 173
+                            169, 89, 203, 136, 167, 168, 72, 111, 206, 151, 61, 123, 56, 96, 70,
+                            119, 134, 182, 178, 165, 69, 158, 184, 225, 255, 157, 112, 185, 164, 3,
+                            117, 57
                         ]
                         .into()
                     ),
                     dq: Some(
                         vec![
-                            58, 163, 22, 19, 121, 33, 38, 86, 173, 131, 203, 62, 15, 248, 71, 81,
-                            35, 130, 126, 14, 185, 88, 222, 2, 238, 120, 52, 94, 33, 38, 43, 109
+                            24, 191, 196, 115, 172, 88, 131, 108, 245, 21, 23, 242, 200, 108, 148,
+                            214, 88, 31, 208, 18, 69, 77, 151, 31, 52, 143, 8, 72, 131, 121, 178,
+                            193
                         ]
                         .into()
                     ),
                     qi: Some(
                         vec![
-                            218, 108, 192, 105, 42, 251, 35, 80, 247, 188, 59, 78, 133, 181, 138,
-                            75, 223, 189, 16, 180, 71, 41, 176, 7, 207, 135, 97, 159, 128, 210, 8,
-                            26
+                            105, 216, 80, 28, 127, 8, 25, 113, 95, 44, 67, 39, 103, 155, 127, 77,
+                            224, 169, 231, 56, 18, 193, 9, 45, 39, 105, 102, 202, 92, 84, 27, 67
                         ]
                         .into()
                     )
                 })
             },
-            algorithm: Some(JsonWebAlgorithm::RS256),
+            algorithm: None,
             key_id: None,
             key_ops: KeyOps::empty(),
-            key_use: None,
+            key_use: Some(KeyUse::Encryption),
         }
     );
 }
@@ -273,10 +298,9 @@ fn p256_private_to_pem() {
     assert_eq!(
         jwk.key.to_pem().unwrap(),
 "-----BEGIN PRIVATE KEY-----
-MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgZoKQ9j4dhIBlMRVr
-v+QG8P/T9sutv3/95eio9MtpgKigCgYIKoZIzj0DAQehRANCAARA4wea/3q1WUm/
-642qmucNIoiPkCItNcpGiZdidq/Q3U42GaB53LWrRBOjQqypl0HSST5zc2RF/JwZ
-mXXtwGOJ
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgZoKQ9j4dhIBlMRVr
+v+QG8P/T9sutv3/95eio9MtpgKihRANCAARA4wea/3q1WUm/642qmucNIoiPkCIt
+NcpGiZdidq/Q3U42GaB53LWrRBOjQqypl0HSST5zc2RF/JwZmXXtwGOJ
 -----END PRIVATE KEY-----
 "
     );

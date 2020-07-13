@@ -200,9 +200,12 @@ impl Key {
                         pkcs8::write_private(oids, |writer: &mut DERWriterSeq| {
                             writer.next().write_i8(1); // version
                             writer.next().write_bytes(private_point.as_slice());
-                            writer.next().write_tagged(Tag::context(0), |writer| {
-                                writer.write_oid(&prime256v1_oid)
-                            });
+                            // The following tagged value is optional. OpenSSL produces it,
+                            // but many tools, including jwt.io and `jsonwebtoken`, don't like it,
+                            // so we don't include it.
+                            // writer.next().write_tagged(Tag::context(0), |writer| {
+                            //     writer.write_oid(&prime256v1_oid)
+                            // });
                             writer.next().write_tagged(Tag::context(1), write_public);
                         })
                     }
@@ -285,6 +288,45 @@ impl Key {
         }
         writeln!(&mut pem, "-----END {} KEY-----", key_ty).unwrap();
         Ok(pem)
+    }
+
+    /// Generates a new symmetric key with the specified number of bits.
+    /// Best used with one of the HS algorithms (e.g., HS256).
+    #[cfg(feature = "generate")]
+    pub fn generate_symmetric(num_bits: usize) -> Self {
+        use rand::RngCore;
+        let mut bytes = Vec::with_capacity(num_bits / 8);
+        rand::thread_rng().fill_bytes(&mut bytes);
+        Self::Symmetric { key: bytes.into() }
+    }
+
+    /// Generates a new EC keypair using the prime256 curve.
+    /// Used with the ES256 algorithm.
+    #[cfg(feature = "generate")]
+    pub fn generate_p256() -> Self {
+        use p256::elliptic_curve::generic_array::GenericArray;
+        use rand::RngCore;
+
+        let mut sk_bytes = GenericArray::default();
+        rand::thread_rng().fill_bytes(&mut sk_bytes);
+        let sk = p256::SecretKey::new(sk_bytes);
+        let sk_scalar = p256::arithmetic::Scalar::from_secret(sk).unwrap();
+
+        let pk = p256::arithmetic::ProjectivePoint::generator() * &sk_scalar;
+        let pk_bytes = &pk
+            .to_affine()
+            .unwrap()
+            .to_uncompressed_pubkey()
+            .into_bytes()[1..];
+        let (x_bytes, y_bytes) = pk_bytes.split_at(32);
+
+        Self::EC {
+            curve: Curve::P256 {
+                d: Some(sk_scalar.to_bytes().into()),
+                x: ByteArray::try_from_slice(x_bytes).unwrap(),
+                y: ByteArray::try_from_slice(y_bytes).unwrap(),
+            },
+        }
     }
 }
 
