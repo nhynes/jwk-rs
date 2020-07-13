@@ -1,6 +1,65 @@
 #![allow(incomplete_features)]
 #![feature(box_syntax, const_generics, fixed_size_array)]
 
+//! # jsonwebkey
+//!
+//! *[JSON Web Key (JWK)](https://tools.ietf.org/html/rfc7517#section-4.3) (de)serialization, generation, and conversion.*
+//!
+//! **Note**: this crate requires Rust nightly >= 1.45 because it uses
+//! `feature(const_generics, fixed_size_array)` to enable statically-checked key lengths.
+//!
+//! ## Examples
+//!
+//! ### Deserializing from JSON
+//!
+//! ```
+//! extern crate jsonwebkey as jwk;
+//! // Generated using https://mkjwk.org/.
+//! let jwt_str = r#"{
+//!    "kty": "oct",
+//!    "use": "sig",
+//!    "kid": "my signing key",
+//!    "k": "Wpj30SfkzM_m0Sa_B2NqNw",
+//!    "alg": "HS256"
+//! }"#;
+//! let jwk: jwk::JsonWebKey = jwt_str.parse().unwrap();
+//! println!("{:#?}", jwk); // looks like `jwt_str` but with reordered fields.
+//! ```
+//!
+//! ### Using with other crates
+//!
+//! ```
+//! extern crate jsonwebtoken as jwt;
+//! extern crate jsonwebkey as jwk;
+//!
+//! #[derive(serde::Serialize, serde::Deserialize)]
+//! struct TokenClaims {}
+//!
+//! let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256());
+//! my_jwk.set_algorithm(jwk::Algorithm::ES256);
+//!
+//! let encoding_key = jwt::EncodingKey::from_ec_der(&my_jwk.key.to_der().unwrap());
+//! let token = jwt::encode(
+//!     &jwt::Header::new(my_jwk.algorithm.unwrap().into()),
+//!     &TokenClaims {},
+//!     &encoding_key,
+//! ).unwrap();
+//!
+//! let public_pem = my_jwk.key.to_public().unwrap().to_pem().unwrap();
+//! let decoding_key = jwt::DecodingKey::from_ec_pem(public_pem.as_bytes()).unwrap();
+//! let mut validation = jwt::Validation::new(my_jwk.algorithm.unwrap().into());
+//! validation.validate_exp = false;
+//! jwt::decode::<TokenClaims>(&token, &decoding_key, &validation).unwrap();
+//! ```
+//!
+//! ## Features
+//!
+//! * `convert` - enables `Key::{to_der, to_pem}`.
+//!               This pulls in the [yasna](https://crates.io/crates/yasna) crate.
+//! * `generate` - enables `Key::{generate_p256, generate_symmetric}`.
+//!                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
+//! * `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
+
 mod byte_array;
 mod byte_vec;
 mod key_ops;
@@ -8,10 +67,7 @@ mod key_ops;
 mod tests;
 mod utils;
 
-use std::array::FixedSizeArray;
-
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroize;
 
 pub use byte_array::ByteArray;
 pub use byte_vec::ByteVec;
@@ -32,7 +88,7 @@ pub struct JsonWebKey {
     pub key_id: Option<String>,
 
     #[serde(default, rename = "alg", skip_serializing_if = "Option::is_none")]
-    pub algorithm: Option<JsonWebAlgorithm>,
+    pub algorithm: Option<Algorithm>,
 }
 
 impl JsonWebKey {
@@ -46,7 +102,7 @@ impl JsonWebKey {
         }
     }
 
-    pub fn set_algorithm(&mut self, alg: JsonWebAlgorithm) -> Result<(), Error> {
+    pub fn set_algorithm(&mut self, alg: Algorithm) -> Result<(), Error> {
         Self::validate_algorithm(alg, &*self.key)?;
         self.algorithm = Some(alg);
         Ok(())
@@ -56,8 +112,8 @@ impl JsonWebKey {
         Ok(serde_json::from_slice(bytes.as_ref())?)
     }
 
-    fn validate_algorithm(alg: JsonWebAlgorithm, key: &Key) -> Result<(), Error> {
-        use JsonWebAlgorithm::*;
+    fn validate_algorithm(alg: Algorithm, key: &Key) -> Result<(), Error> {
+        use Algorithm::*;
         use Key::*;
         match (alg, key) {
             (
@@ -199,6 +255,7 @@ impl Key {
                     Some(private_point) => {
                         pkcs8::write_private(oids, |writer: &mut DERWriterSeq| {
                             writer.next().write_i8(1); // version
+                            use std::array::FixedSizeArray;
                             writer.next().write_bytes(private_point.as_slice());
                             // The following tagged value is optional. OpenSSL produces it,
                             // but many tools, including jwt.io and `jsonwebtoken`, don't like it,
@@ -333,28 +390,32 @@ impl Key {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "crv")]
 pub enum Curve {
-    /// prime256v1
+    /// Parameters of the prime256v1 (P256) curve.
     #[serde(rename = "P-256")]
     P256 {
-        /// Private point.
+        /// The private scalar.
         #[serde(skip_serializing_if = "Option::is_none")]
         d: Option<ByteArray<32>>,
+        /// The curve point x coordinate.
         x: ByteArray<32>,
+        /// The curve point y coordinate.
         y: ByteArray<32>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RsaPublic {
-    /// Public exponent. Must be 65537.
+    /// The standard public exponent, 65537.
     pub e: PublicExponent,
-    /// Modulus, p*q.
+    /// The modulus, p*q.
     pub n: ByteVec,
 }
 
 const PUBLIC_EXPONENT: u32 = 65537;
 const PUBLIC_EXPONENT_B64: &str = "AQAB"; // little-endian, strip zeros
 const PUBLIC_EXPONENT_B64_PADDED: &str = "AQABAA==";
+
+/// The standard RSA public exponent, 65537.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PublicExponent;
 
@@ -391,7 +452,7 @@ pub struct RsaPrivate {
     /// First factor Chinese Remainder Theorem (CRT) exponent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dp: Option<ByteVec>,
-    /// Second factor Chinese Remainder Theorem (CRT) exponent.
+    /// Second factor CRT exponent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dq: Option<ByteVec>,
     /// First CRT coefficient.
@@ -407,15 +468,15 @@ pub enum KeyUse {
     Encryption,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
-pub enum JsonWebAlgorithm {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Algorithm {
     HS256,
     RS256,
     ES256,
 }
 
 #[cfg(any(test, feature = "jsonwebtoken"))]
-impl Into<jsonwebtoken::Algorithm> for JsonWebAlgorithm {
+impl Into<jsonwebtoken::Algorithm> for Algorithm {
     fn into(self) -> jsonwebtoken::Algorithm {
         match self {
             Self::HS256 => jsonwebtoken::Algorithm::HS256,

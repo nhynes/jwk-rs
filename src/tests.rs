@@ -24,6 +24,7 @@ static RSA_JWK_FIXTURE: &str = r#"{
         "qi": "adhQHH8IGXFfLEMnZ5t_TeCp5zgSwQktJ2lmylxUG0M",
         "dp": "qVnLiKeoSG_Olz17OGBGd4a2sqVFnrjh_51wuaQDdTk",
         "dq": "GL_Ec6xYg2z1FRfyyGyU1lgf0BJFTZcfNI8ISIN5ssE",
+        "key_ops": ["wrapKey"],
         "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
     }"#;
 
@@ -56,7 +57,7 @@ fn deserialize_es256() {
                     .into(),
                 },
             },
-            algorithm: Some(JsonWebAlgorithm::ES256),
+            algorithm: Some(Algorithm::ES256),
             key_id: Some("a key".into()),
             key_ops: KeyOps::empty(),
             key_use: Some(KeyUse::Encryption),
@@ -94,7 +95,7 @@ fn generate_p256() {
     struct TokenClaims {}
 
     let mut the_jwk = JsonWebKey::new(Key::generate_p256());
-    the_jwk.set_algorithm(JsonWebAlgorithm::ES256).unwrap();
+    the_jwk.set_algorithm(Algorithm::ES256).unwrap();
 
     let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der().unwrap());
     let token = jwt::encode(
@@ -127,7 +128,7 @@ fn deserialize_hs256() {
                 // The parameters were decoded using a 10-liner Rust script.
                 key: vec![180, 3, 141, 233].into(),
             },
-            algorithm: Some(JsonWebAlgorithm::HS256),
+            algorithm: Some(Algorithm::HS256),
             key_id: None,
             key_ops: KeyOps::SIGN | KeyOps::VERIFY,
             key_use: None,
@@ -219,7 +220,7 @@ fn deserialize_rs256() {
             },
             algorithm: None,
             key_id: None,
-            key_ops: KeyOps::empty(),
+            key_ops: KeyOps::WRAP_KEY,
             key_use: Some(KeyUse::Encryption),
         }
     );

@@ -4,13 +4,11 @@ use serde::{
 };
 
 macro_rules! impl_key_ops {
-    ($(($key_op:ident, $i:literal)),+,) => {
-        paste::item! {
-            bitflags::bitflags! {
-                #[derive(Default)]
-                pub struct KeyOps: u16 {
-                    $(const [<$key_op:upper>] = $i;)*
-                }
+    ($(($key_op:ident, $const_name:ident, $i:literal)),+,) => {
+        bitflags::bitflags! {
+            #[derive(Default)]
+            pub struct KeyOps: u16 {
+                $(const $const_name = $i;)*
             }
         }
 
@@ -18,7 +16,7 @@ macro_rules! impl_key_ops {
             fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
                 let mut seq = s.serialize_seq(Some(self.bits().count_ones() as usize))?;
                 $(
-                    if self.contains(paste::expr! { KeyOps::[<$key_op:upper>] }) {
+                    if self.contains(KeyOps::$const_name) {
                         seq.serialize_element(stringify!($key_op))?;
                     }
                 )+
@@ -33,7 +31,7 @@ macro_rules! impl_key_ops {
                 for op_str in op_strs {
                     $(
                         if op_str == stringify!($key_op) {
-                            ops |= paste::expr! { KeyOps::[<$key_op:upper>] };
+                            ops |= KeyOps::$const_name;
                             continue;
                         }
                     )+
@@ -47,12 +45,12 @@ macro_rules! impl_key_ops {
 
 #[rustfmt::skip]
 impl_key_ops!(
-    (sign,       0b00000001),
-    (verify,     0b00000010),
-    (encrypt,    0b00000100),
-    (decrypt,    0b00001000),
-    (wrapKey,    0b00010000),
-    (unwrapKey,  0b00100000),
-    (deriveKey,  0b01000000),
-    (deriveBits, 0b10000000),
+    (sign,       SIGN,        0b00000001),
+    (verify,     VERIFY,      0b00000010),
+    (encrypt,    ENCRYPT,     0b00000100),
+    (decrypt,    DECRYPT,     0b00001000),
+    (wrapKey,    WRAP_KEY,    0b00010000),
+    (unwrapKey,  UNWRAP_KEY,  0b00100000),
+    (deriveKey,  DERIVE_KEY,  0b01000000),
+    (deriveBits, DERIVE_BITS, 0b10000000),
 );
