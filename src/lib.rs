@@ -36,8 +36,40 @@ pub struct JsonWebKey {
 }
 
 impl JsonWebKey {
+    pub fn new(key: Key) -> Self {
+        Self {
+            key: box key,
+            key_use: None,
+            key_ops: KeyOps::empty(),
+            key_id: None,
+            algorithm: None,
+        }
+    }
+
+    pub fn set_algorithm(&mut self, alg: JsonWebAlgorithm) -> Result<(), Error> {
+        Self::validate_algorithm(alg, &*self.key)?;
+        self.algorithm = Some(alg);
+        Ok(())
+    }
+
     pub fn from_slice(bytes: impl AsRef<[u8]>) -> Result<Self, Error> {
         Ok(serde_json::from_slice(bytes.as_ref())?)
+    }
+
+    fn validate_algorithm(alg: JsonWebAlgorithm, key: &Key) -> Result<(), Error> {
+        use JsonWebAlgorithm::*;
+        use Key::*;
+        match (alg, key) {
+            (
+                ES256,
+                EC {
+                    curve: Curve::P256 { .. },
+                },
+            )
+            | (RS256, RSA { .. })
+            | (HS256, Symmetric { .. }) => Ok(()),
+            _ => Err(Error::MismatchedAlgorithm),
+        }
     }
 }
 
@@ -46,24 +78,11 @@ impl std::str::FromStr for JsonWebKey {
     fn from_str(json: &str) -> Result<Self, Self::Err> {
         let jwk = Self::from_slice(json.as_bytes())?;
 
-        // Validate alg.
-        use JsonWebAlgorithm::*;
-        use Key::*;
-        let alg = match &jwk.algorithm {
+        let alg = match jwk.algorithm {
             Some(alg) => alg,
             None => return Ok(jwk),
         };
-        match (alg, &*jwk.key) {
-            (
-                ES256,
-                EC {
-                    curve: Curve::P256 { .. },
-                },
-            )
-            | (RS256, RSA { .. })
-            | (HS256, Symmetric { .. }) => Ok(jwk),
-            _ => Err(Error::MismatchedAlgorithm),
-        }
+        Self::validate_algorithm(alg, &*jwk.key).map(|_| jwk)
     }
 }
 
@@ -346,11 +365,22 @@ pub enum KeyUse {
     Encryption,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Zeroize)]
 pub enum JsonWebAlgorithm {
     HS256,
     RS256,
     ES256,
+}
+
+#[cfg(any(test, feature = "jsonwebtoken"))]
+impl Into<jsonwebtoken::Algorithm> for JsonWebAlgorithm {
+    fn into(self) -> jsonwebtoken::Algorithm {
+        match self {
+            Self::HS256 => jsonwebtoken::Algorithm::HS256,
+            Self::ES256 => jsonwebtoken::Algorithm::ES256,
+            Self::RS256 => jsonwebtoken::Algorithm::RS256,
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

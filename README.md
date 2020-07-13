@@ -40,3 +40,4 @@ fn main() {
 
 * `convert` - enables `Key::{to_der, to_pem}`.
               This pulls in the [yasna](https://crates.io/crates/yasna) crate.
+* `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
