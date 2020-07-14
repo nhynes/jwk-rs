@@ -1,8 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(box_syntax, const_generics, fixed_size_array)]
 
-//! # jsonwebkey
-//!
 //! *[JSON Web Key (JWK)](https://tools.ietf.org/html/rfc7517#section-4.3) (de)serialization, generation, and conversion.*
 //!
 //! **Note**: this crate requires Rust nightly >= 1.45 because it uses
