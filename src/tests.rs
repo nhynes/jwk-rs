@@ -86,7 +86,7 @@ fn serialize_es256() {
     );
 }
 
-#[cfg(feature = "generate")]
+#[cfg(all(feature = "jwt-convert", feature = "generate"))]
 #[test]
 fn generate_p256() {
     extern crate jsonwebtoken as jwt;
@@ -97,7 +97,7 @@ fn generate_p256() {
     let mut the_jwk = JsonWebKey::new(Key::generate_p256());
     the_jwk.set_algorithm(Algorithm::ES256).unwrap();
 
-    let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der().unwrap());
+    let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der());
     let token = jwt::encode(
         &jwt::Header::new(the_jwk.algorithm.unwrap().into()),
         &TokenClaims {},
@@ -107,7 +107,7 @@ fn generate_p256() {
 
     let mut validation = jwt::Validation::new(the_jwk.algorithm.unwrap().into());
     validation.validate_exp = false;
-    let public_pem = the_jwk.key.to_public().unwrap().to_pem().unwrap();
+    let public_pem = the_jwk.key.to_public().unwrap().to_pem();
     let decoding_key = jwt::DecodingKey::from_ec_pem(public_pem.as_bytes()).unwrap();
     jwt::decode::<TokenClaims>(&token, &decoding_key, &validation).unwrap();
 }
@@ -290,14 +290,14 @@ fn mismatched_algorithm() {
     );
 }
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "pkcs-convert")]
 #[test]
 fn p256_private_to_pem() {
     // generated using mkjwk, converted using node-jwk-to-pem, verified using openssl
     let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
-        jwk.key.to_pem().unwrap(),
+        jwk.key.to_pem(),
 "-----BEGIN PRIVATE KEY-----
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgZoKQ9j4dhIBlMRVr
 v+QG8P/T9sutv3/95eio9MtpgKihRANCAARA4wea/3q1WUm/642qmucNIoiPkCIt
@@ -307,13 +307,13 @@ NcpGiZdidq/Q3U42GaB53LWrRBOjQqypl0HSST5zc2RF/JwZmXXtwGOJ
     );
 }
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "pkcs-convert")]
 #[test]
 fn p256_public_to_pem() {
     let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
-        jwk.key.to_public().unwrap().to_pem().unwrap(),
+        jwk.key.to_public().unwrap().to_pem(),
 "-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQOMHmv96tVlJv+uNqprnDSKIj5Ai
 LTXKRomXYnav0N1ONhmgedy1q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
@@ -322,13 +322,13 @@ LTXKRomXYnav0N1ONhmgedy1q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
     );
 }
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "pkcs-convert")]
 #[test]
 fn rsa_private_to_pem() {
     let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
-        jwk.key.to_pem().unwrap(),
+        jwk.key.to_pem(),
 "-----BEGIN PRIVATE KEY-----
 MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEApCzbcd9kjvg5rfGH
 dEMWnXo49zbB6FLQ+m0B0BvVp0aojVWYa0xujC+ZP7ZhxByPxyc2PazwFJJi9ivZ
@@ -343,13 +343,13 @@ J2lmylxUG0M=
     );
 }
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "pkcs-convert")]
 #[test]
 fn rsa_public_to_pem() {
     let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
-        jwk.key.to_public().unwrap().to_pem().unwrap(),
+        jwk.key.to_public().unwrap().to_pem(),
 "-----BEGIN PUBLIC KEY-----
 MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKQs23HfZI74Oa3xh3RDFp16OPc2wehS
 0PptAdAb1adGqI1VmGtMbowvmT+2YcQcj8cnNj2s8BSSYvYr2f4IEcMCAwEAAQ==

@@ -24,7 +24,8 @@ yasna = { version = "0.3", optional = true, features = ["num-bigint"] }
 zeroize = { version = "1.1", features = ["zeroize_derive"] }
 
 [features]
-convert = ["num-bigint", "yasna"]
+pkcs-convert = ["num-bigint", "yasna"]
+jwt-convert = ["pkcs-convert", "jsonwebtoken"]
 generate = ["p256", "rand"]
 
 [dev-dependencies]

@@ -31,7 +31,7 @@ pub fn deserialize_base64<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D:
     })
 }
 
-#[cfg(feature = "convert")]
+#[cfg(feature = "pkcs-convert")]
 pub mod pkcs8 {
     use yasna::{
         models::{ObjectIdentifier, TaggedDerValue},

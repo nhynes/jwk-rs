@@ -20,13 +20,14 @@
 //!    "k": "Wpj30SfkzM_m0Sa_B2NqNw",
 //!    "alg": "HS256"
 //! }"#;
-//! let jwk: jwk::JsonWebKey = jwt_str.parse().unwrap();
-//! println!("{:#?}", jwk); // looks like `jwt_str` but with reordered fields.
+//! let the_jwk: jwk::JsonWebKey = jwt_str.parse().unwrap();
+//! println!("{:#?}", the_jwk); // looks like `jwt_str` but with reordered fields.
 //! ```
 //!
 //! ### Using with other crates
 //!
 //! ```
+//! #[cfg(all(feature = "generate", feature = "jwt-convert"))] {
 //! extern crate jsonwebtoken as jwt;
 //! extern crate jsonwebkey as jwk;
 //!
@@ -36,18 +37,17 @@
 //! let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256());
 //! my_jwk.set_algorithm(jwk::Algorithm::ES256);
 //!
-//! let encoding_key = jwt::EncodingKey::from_ec_der(&my_jwk.key.to_der().unwrap());
+//! let alg: jwt::Algorithm = my_jwk.algorithm.unwrap().into();
 //! let token = jwt::encode(
-//!     &jwt::Header::new(my_jwk.algorithm.unwrap().into()),
+//!     &jwt::Header::new(alg),
 //!     &TokenClaims {},
-//!     &encoding_key,
+//!     &my_jwk.key.to_encoding_key(),
 //! ).unwrap();
 //!
-//! let public_pem = my_jwk.key.to_public().unwrap().to_pem().unwrap();
-//! let decoding_key = jwt::DecodingKey::from_ec_pem(public_pem.as_bytes()).unwrap();
-//! let mut validation = jwt::Validation::new(my_jwk.algorithm.unwrap().into());
+//! let mut validation = jwt::Validation::new(alg);
 //! validation.validate_exp = false;
-//! jwt::decode::<TokenClaims>(&token, &decoding_key, &validation).unwrap();
+//! jwt::decode::<TokenClaims>(&token, &my_jwk.key.to_decoding_key(), &validation).unwrap();
+//! }
 //! ```
 //!
 //! ## Features
@@ -65,13 +65,15 @@ mod key_ops;
 mod tests;
 mod utils;
 
+use std::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
 
 pub use byte_array::ByteArray;
 pub use byte_vec::ByteVec;
 pub use key_ops::KeyOps;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JsonWebKey {
     #[serde(flatten)]
     pub key: Box<Key>,
@@ -196,12 +198,12 @@ impl Key {
         !self.is_private()
     }
 
-    /// Returns the public part of this key, if it's symmetric.
-    pub fn to_public(&self) -> Option<Self> {
+    /// Returns the public part of this key (symmetric keys have no public parts).
+    pub fn to_public(&self) -> Option<Cow<Self>> {
         if self.is_public() {
-            return Some(self.clone());
+            return Some(Cow::Borrowed(self));
         }
-        Some(match self {
+        Some(Cow::Owned(match self {
             Self::Symmetric { .. } => return None,
             Self::EC {
                 curve: Curve::P256 { x, y, .. },
@@ -216,19 +218,19 @@ impl Key {
                 public: public.clone(),
                 private: None,
             },
-        })
+        }))
     }
 
     /// If this key is asymmetric, encodes it as PKCS#8.
-    #[cfg(feature = "convert")]
-    pub fn to_der(&self) -> Result<Vec<u8>, PkcsConvertError> {
+    #[cfg(feature = "pkcs-convert")]
+    pub fn try_to_der(&self) -> Result<Vec<u8>, ConversionError> {
         use num_bigint::BigUint;
         use yasna::{models::ObjectIdentifier, DERWriter, DERWriterSeq, Tag};
 
         use crate::utils::pkcs8;
 
         if let Self::Symmetric { .. } = self {
-            return Err(PkcsConvertError::NotAsymmetric);
+            return Err(ConversionError::NotAsymmetric);
         }
 
         Ok(match self {
@@ -253,8 +255,7 @@ impl Key {
                     Some(private_point) => {
                         pkcs8::write_private(oids, |writer: &mut DERWriterSeq| {
                             writer.next().write_i8(1); // version
-                            use std::array::FixedSizeArray;
-                            writer.next().write_bytes(private_point.as_slice());
+                            writer.next().write_bytes(&**private_point);
                             // The following tagged value is optional. OpenSSL produces it,
                             // but many tools, including jwt.io and `jsonwebtoken`, don't like it,
                             // so we don't include it.
@@ -308,7 +309,7 @@ impl Key {
                             qi: Some(_),
                         },
                     ) => pkcs8::write_private(oids, |writer| write_private(writer, private)),
-                    Some(_) => return Err(PkcsConvertError::MissingRsaParams),
+                    Some(_) => return Err(ConversionError::MissingRsaParams),
                     None => pkcs8::write_public(oids, |writer| {
                         let body =
                             yasna::construct_der(|writer| writer.write_sequence(write_public));
@@ -320,11 +321,18 @@ impl Key {
         })
     }
 
+    /// Unwrapping `try_to_der`.
+    /// Panics if the key is not asymmetric or there are missing RSA components.
+    #[cfg(feature = "pkcs-convert")]
+    pub fn to_der(&self) -> Vec<u8> {
+        self.try_to_der().unwrap()
+    }
+
     /// If this key is asymmetric, encodes it as PKCS#8 with PEM armoring.
-    #[cfg(feature = "convert")]
-    pub fn to_pem(&self) -> Result<String, PkcsConvertError> {
+    #[cfg(feature = "pkcs-convert")]
+    pub fn try_to_pem(&self) -> Result<String, ConversionError> {
         use std::fmt::Write;
-        let der_b64 = base64::encode(self.to_der()?);
+        let der_b64 = base64::encode(self.try_to_der()?);
         let key_ty = if self.is_private() {
             "PRIVATE"
         } else {
@@ -332,6 +340,7 @@ impl Key {
         };
         let mut pem = String::new();
         writeln!(&mut pem, "-----BEGIN {} KEY-----", key_ty).unwrap();
+        //^ re: `unwrap`, if writing to a string fails, we've got bigger issues.
         const MAX_LINE_LEN: usize = 64;
         for i in (0..der_b64.len()).step_by(MAX_LINE_LEN) {
             writeln!(
@@ -343,6 +352,13 @@ impl Key {
         }
         writeln!(&mut pem, "-----END {} KEY-----", key_ty).unwrap();
         Ok(pem)
+    }
+
+    /// Unwrapping `try_to_pem`.
+    /// Panics if the key is not asymmetric or there are missing RSA components.
+    #[cfg(feature = "pkcs-convert")]
+    pub fn to_pem(&self) -> String {
+        self.try_to_pem().unwrap()
     }
 
     /// Generates a new symmetric key with the specified number of bits.
@@ -473,16 +489,62 @@ pub enum Algorithm {
     ES256,
 }
 
-#[cfg(any(test, feature = "jsonwebtoken"))]
-impl Into<jsonwebtoken::Algorithm> for Algorithm {
-    fn into(self) -> jsonwebtoken::Algorithm {
-        match self {
-            Self::HS256 => jsonwebtoken::Algorithm::HS256,
-            Self::ES256 => jsonwebtoken::Algorithm::ES256,
-            Self::RS256 => jsonwebtoken::Algorithm::RS256,
+#[cfg(feature = "jwt-convert")]
+const _IMPL_JWT_CONVERSIONS: () = {
+    use jsonwebtoken as jwt;
+
+    impl Into<jwt::Algorithm> for Algorithm {
+        fn into(self) -> jsonwebtoken::Algorithm {
+            match self {
+                Self::HS256 => jwt::Algorithm::HS256,
+                Self::ES256 => jwt::Algorithm::ES256,
+                Self::RS256 => jwt::Algorithm::RS256,
+            }
         }
     }
-}
+
+    impl Key {
+        /// Returns an `EncodingKey` if the key is private.
+        pub fn try_to_encoding_key(&self) -> Result<jwt::EncodingKey, ConversionError> {
+            if self.is_public() {
+                return Err(ConversionError::NotPrivate);
+            }
+            Ok(match self {
+                Self::Symmetric { key } => jwt::EncodingKey::from_secret(key),
+                // The following two conversion will not panic, as we've ensured that the keys
+                // are private and tested that the successful output of `try_to_pem` is valid.
+                Self::EC { .. } => {
+                    jwt::EncodingKey::from_ec_pem(self.try_to_pem()?.as_bytes()).unwrap()
+                }
+                Self::RSA { .. } => {
+                    jwt::EncodingKey::from_rsa_pem(self.try_to_pem()?.as_bytes()).unwrap()
+                }
+            })
+        }
+
+        /// Unwrapping `try_to_encoding_key`. Panics if the key is public.
+        pub fn to_encoding_key(&self) -> jwt::EncodingKey {
+            self.try_to_encoding_key().unwrap()
+        }
+
+        pub fn to_decoding_key(&self) -> jwt::DecodingKey<'static> {
+            match self {
+                Self::Symmetric { key } => jwt::DecodingKey::from_secret(key).into_static(),
+                Self::EC { .. } => {
+                    // The following will not panic: all EC JWKs have public components due to
+                    // typing. PEM conversion will always succeed, for the same reason.
+                    // Hence, jwt::DecodingKey shall have no issue with de-converting.
+                    jwt::DecodingKey::from_ec_pem(self.to_public().unwrap().to_pem().as_bytes())
+                        .unwrap()
+                        .into_static()
+                }
+                Self::RSA { .. } => jwt::DecodingKey::from_rsa_pem(self.to_pem().as_bytes())
+                    .unwrap()
+                    .into_static(),
+            }
+        }
+    }
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -497,10 +559,14 @@ pub enum Error {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum PkcsConvertError {
+pub enum ConversionError {
     #[error("encoding RSA JWK as PKCS#8 requires specifing all of p, q, dp, dq, qi")]
     MissingRsaParams,
 
     #[error("a symmetric key can not be encoded using PKCS#8")]
     NotAsymmetric,
+
+    #[cfg(feature = "jwt-convert")]
+    #[error("a public key cannot be converted to a `jsonwebtoken::EncodingKey`")]
+    NotPrivate,
 }

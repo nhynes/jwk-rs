@@ -34,13 +34,16 @@ let jwt_str = r#"{
    "k": "Wpj30SfkzM_m0Sa_B2NqNw",
    "alg": "HS256"
 }"#;
-let jwk: jwk::JsonWebKey = jwt_str.parse().unwrap();
-println!("{:#?}", jwk); // looks like `jwt_str` but with reordered fields.
+let the_jwk: jwk::JsonWebKey = jwt_str.parse().unwrap();
+println!("{:#?}", the_jwk); // looks like `jwt_str` but with reordered fields.
 ```
 
 ### Using with other crates
 
+*Note:* The following example requires the `jwt-convert` feature.
+
 ```rust
+#[cfg(all(feature = "generate", feature = "jwt-convert"))] {
 extern crate jsonwebtoken as jwt;
 extern crate jsonwebkey as jwk;
 
@@ -50,24 +53,24 @@ struct TokenClaims {}
 let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256());
 my_jwk.set_algorithm(jwk::Algorithm::ES256);
 
-let encoding_key = jwt::EncodingKey::from_ec_der(&my_jwk.key.to_der().unwrap());
+let alg: jwt::Algorithm = my_jwk.algorithm.unwrap().into();
 let token = jwt::encode(
-    &jwt::Header::new(my_jwk.algorithm.unwrap().into()),
+    &jwt::Header::new(alg),
     &TokenClaims {},
-    &encoding_key,
+    &my_jwk.key.to_encoding_key(),
 ).unwrap();
 
-let public_pem = my_jwk.key.to_public().unwrap().to_pem().unwrap();
-let decoding_key = jwt::DecodingKey::from_ec_pem(public_pem.as_bytes()).unwrap();
-let mut validation = jwt::Validation::new(my_jwk.algorithm.unwrap().into());
+let mut validation = jwt::Validation::new(alg);
 validation.validate_exp = false;
-jwt::decode::<TokenClaims>(&token, &decoding_key, &validation).unwrap();
+jwt::decode::<TokenClaims>(&token, &my_jwk.key.to_decoding_key(), &validation).unwrap();
+}
 ```
 
 ## Features
 
-* `convert` - enables `Key::{to_der, to_pem}`.
-              This pulls in the [yasna](https://crates.io/crates/yasna) crate.
+* `pkcs-convert` - enables `Key::{to_der, to_pem}`.
+                   This pulls in the [yasna](https://crates.io/crates/yasna) crate.
 * `generate` - enables `Key::{generate_p256, generate_symmetric}`.
                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
-* `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
+* `jwt-convert` - enables conversions to types in the
+                  [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
