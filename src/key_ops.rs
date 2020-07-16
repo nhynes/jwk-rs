@@ -54,3 +54,21 @@ impl_key_ops!(
     (deriveKey,  DERIVE_KEY,  0b01000000),
     (deriveBits, DERIVE_BITS, 0b10000000),
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_invalid() {
+        let result: Result<KeyOps, _> = serde_json::from_str(r#"["unknown"]"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn serialize() {
+        let ops = KeyOps::SIGN | KeyOps::DERIVE_BITS;
+        let json = serde_json::to_string(&ops).unwrap();
+        assert_eq!(json, r#"["sign","deriveBits"]"#)
+    }
+}

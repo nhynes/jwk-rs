@@ -1,6 +1,6 @@
 [package]
 name = "jsonwebkey"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Nick Hynes <nhynes@nhynes.com>"]
 description = "JSON Web Key (JWK) (de)serialization, generation, and conversion."
 readme = "README.md"

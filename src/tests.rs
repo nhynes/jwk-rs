@@ -28,6 +28,12 @@ static RSA_JWK_FIXTURE: &str = r#"{
         "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
     }"#;
 
+#[cfg(feature = "pkcs-convert")]
+static OCT_FIXTURE: &str = r#"{
+        "kty": "oct",
+        "k": "TdSBZdXL5n39JXlQc7QL3w"
+    }"#;
+
 #[test]
 fn deserialize_es256() {
     let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
@@ -347,13 +353,66 @@ J2lmylxUG0M=
 #[test]
 fn rsa_public_to_pem() {
     let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
-    #[rustfmt::skip]
     assert_eq!(
         jwk.key.to_public().unwrap().to_pem(),
-"-----BEGIN PUBLIC KEY-----
+        "-----BEGIN PUBLIC KEY-----
 MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAKQs23HfZI74Oa3xh3RDFp16OPc2wehS
 0PptAdAb1adGqI1VmGtMbowvmT+2YcQcj8cnNj2s8BSSYvYr2f4IEcMCAwEAAQ==
 -----END PUBLIC KEY-----
 "
     );
+}
+
+#[cfg(feature = "pkcs-convert")]
+#[test]
+fn oct_to_pem() {
+    let jwk = JsonWebKey::from_str(OCT_FIXTURE).unwrap();
+    assert!(jwk.key.try_to_pem().is_err());
+}
+
+#[cfg(feature = "pkcs-convert")]
+#[test]
+fn oct_to_public() {
+    let jwk = JsonWebKey::from_str(OCT_FIXTURE).unwrap();
+    assert!(jwk.key.to_public().is_none());
+}
+
+#[cfg(feature = "generate")]
+#[test]
+fn generate_oct() {
+    let bits = 56;
+    match Key::generate_symmetric(bits) {
+        Key::Symmetric { key } if key.len() == 56 / 8 => {}
+        k => panic!("`generate_symmetric` generated {:?}", k),
+    }
+}
+
+#[test]
+fn ec_is_private() {
+    let private_jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
+    assert!(private_jwk.key.is_private());
+    assert!(!private_jwk.key.to_public().unwrap().is_private());
+    let mut k: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(P256_JWK_FIXTURE).unwrap();
+    k.remove("d");
+    let public_jwk = JsonWebKey::from_str(&serde_json::to_string(&k).unwrap()).unwrap();
+    assert!(!public_jwk.key.is_private());
+    assert!(!public_jwk.key.to_public().unwrap().is_private());
+}
+
+#[test]
+fn rsa_is_private() {
+    let private_jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    assert!(private_jwk.key.is_private());
+    assert!(!private_jwk.key.to_public().unwrap().is_private());
+
+    static PUBLIC_RSA_JWK_FIXTURE: &str = r#"{
+        "kty": "RSA",
+        "e": "AQAB",
+        "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
+    }"#;
+
+    let public_jwk = JsonWebKey::from_str(PUBLIC_RSA_JWK_FIXTURE).unwrap();
+    assert!(!public_jwk.key.is_private());
+    assert!(!public_jwk.key.to_public().unwrap().is_private());
 }

@@ -1,0 +1,9 @@
+[default_coverage]
+exclude-files = ["target"]
+all-features = true
+locked = true
+target-dir = "target/tarpaulin"
+
+[report]
+out = ["Html", "Xml"]
+output-dir = "target/tarpaulin"

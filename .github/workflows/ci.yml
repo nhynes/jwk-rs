@@ -62,8 +62,6 @@ jobs:
           override: true
 
       - uses: actions-rs/tarpaulin@v0.1
-        with:
-          args: '--all-features'
 
       - uses: codecov/codecov-action@v1
         with:

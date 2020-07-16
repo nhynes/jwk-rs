@@ -193,14 +193,9 @@ impl Key {
         }
     }
 
-    /// Returns true iff this key only contains non-private components.
-    pub fn is_public(&self) -> bool {
-        !self.is_private()
-    }
-
     /// Returns the public part of this key (symmetric keys have no public parts).
     pub fn to_public(&self) -> Option<Cow<Self>> {
-        if self.is_public() {
+        if !self.is_private() {
             return Some(Cow::Borrowed(self));
         }
         Some(Cow::Owned(match self {
@@ -366,7 +361,7 @@ impl Key {
     #[cfg(feature = "generate")]
     pub fn generate_symmetric(num_bits: usize) -> Self {
         use rand::RngCore;
-        let mut bytes = Vec::with_capacity(num_bits / 8);
+        let mut bytes = vec![0; num_bits / 8];
         rand::thread_rng().fill_bytes(&mut bytes);
         Self::Symmetric { key: bytes.into() }
     }
@@ -506,7 +501,7 @@ const _IMPL_JWT_CONVERSIONS: () = {
     impl Key {
         /// Returns an `EncodingKey` if the key is private.
         pub fn try_to_encoding_key(&self) -> Result<jwt::EncodingKey, ConversionError> {
-            if self.is_public() {
+            if !self.is_private() {
                 return Err(ConversionError::NotPrivate);
             }
             Ok(match self {

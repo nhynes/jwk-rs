@@ -40,8 +40,6 @@ println!("{:#?}", the_jwk); // looks like `jwt_str` but with reordered fields.
 
 ### Using with other crates
 
-*Note:* The following example requires the `jwt-convert` feature.
-
 ```rust
 #[cfg(all(feature = "generate", feature = "jwt-convert"))] {
 extern crate jsonwebtoken as jwt;
