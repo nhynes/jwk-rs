@@ -61,7 +61,7 @@ mod tests {
     use generic_array::typenum::*;
 
     static BYTES: &[u8] = &[1, 2, 3, 4, 5, 6, 7];
-    static BASE64_JSON: &str = "\"AQIDBAUGBw==\"";
+    static BASE64_JSON: &str = "\"AQIDBAUGBw\"";
 
     fn get_de() -> serde_json::Deserializer<serde_json::de::StrRead<'static>> {
         serde_json::Deserializer::from_str(&BASE64_JSON)

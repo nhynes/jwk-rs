@@ -5,7 +5,7 @@ use serde::{
 use zeroize::Zeroizing;
 
 fn base64_config() -> base64::Config {
-    base64::Config::new(base64::CharacterSet::UrlSafe, true /* pad */)
+    base64::Config::new(base64::CharacterSet::UrlSafe, false /* pad */)
 }
 
 fn base64_encode(bytes: impl AsRef<[u8]>) -> String {

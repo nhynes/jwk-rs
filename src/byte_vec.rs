@@ -24,7 +24,7 @@ mod tests {
     use super::*;
 
     static BYTES: &[u8] = &[1, 2, 3, 4, 5, 6, 7];
-    static BASE64_JSON: &str = "\"AQIDBAUGBw==\"";
+    static BASE64_JSON: &str = "\"AQIDBAUGBw\"";
 
     #[test]
     fn test_serde_byte_vec() {

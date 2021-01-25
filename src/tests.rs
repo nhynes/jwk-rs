@@ -87,7 +87,7 @@ fn serialize_es256() {
     };
     assert_eq!(
         jwk.to_string(),
-        r#"{"kty":"EC","crv":"P-256","x":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=","y":"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="}"#
+        r#"{"kty":"EC","crv":"P-256","x":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE","y":"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"}"#
     );
 }
 
@@ -156,7 +156,7 @@ fn serialize_hs256() {
     };
     assert_eq!(
         jwk.to_string(),
-        r#"{"kty":"oct","k":"KioqKioqKioqKioqKioqKg=="}"#
+        r#"{"kty":"oct","k":"KioqKioqKioqKioqKioqKg"}"#
     );
 }
 
