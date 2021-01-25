@@ -16,29 +16,36 @@ fn base64_decode(b64: impl AsRef<[u8]>) -> Result<Vec<u8>, base64::DecodeError> 
     base64::decode_config(b64, base64_config())
 }
 
-pub fn serialize_base64<S: Serializer>(bytes: impl AsRef<[u8]>, s: S) -> Result<S::Ok, S::Error> {
-    base64_encode(bytes).serialize(s)
-}
+pub(crate) mod serde_base64 {
+    use super::*;
 
-pub fn deserialize_base64<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
-    let base64_str = Zeroizing::new(String::deserialize(d)?);
-    base64_decode(&*base64_str).map_err(|e| {
-        #[cfg(debug_assertions)]
-        let err_msg = e.to_string().to_lowercase();
-        #[cfg(not(debug_assertions))]
-        let err_msg = "invalid base64";
-        de::Error::custom(err_msg.strip_suffix(".").unwrap_or(&err_msg))
-    })
+    pub(crate) fn serialize<S: Serializer>(
+        bytes: impl AsRef<[u8]>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
+        base64_encode(bytes).serialize(s)
+    }
+
+    pub(crate) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+        let base64_str = Zeroizing::new(String::deserialize(d)?);
+        base64_decode(&*base64_str).map_err(|e| {
+            #[cfg(debug_assertions)]
+            let err_msg = e.to_string().to_lowercase();
+            #[cfg(not(debug_assertions))]
+            let err_msg = "invalid base64";
+            de::Error::custom(err_msg.strip_suffix(".").unwrap_or(&err_msg))
+        })
+    }
 }
 
 #[cfg(feature = "pkcs-convert")]
-pub mod pkcs8 {
+pub(crate) mod pkcs8 {
     use yasna::{
         models::{ObjectIdentifier, TaggedDerValue},
         DERWriter, DERWriterSeq,
     };
 
-    fn write_oids(writer: &mut DERWriterSeq, oids: &[Option<&ObjectIdentifier>]) {
+    fn write_oids(writer: &mut DERWriterSeq<'_>, oids: &[Option<&ObjectIdentifier>]) {
         for oid in oids {
             match oid {
                 Some(oid) => writer.next().write_oid(oid),
@@ -47,9 +54,9 @@ pub mod pkcs8 {
         }
     }
 
-    pub fn write_private(
+    pub(crate) fn write_private(
         oids: &[Option<&ObjectIdentifier>],
-        body_writer: impl FnOnce(&mut DERWriterSeq),
+        body_writer: impl FnOnce(&mut DERWriterSeq<'_>),
     ) -> Vec<u8> {
         yasna::construct_der(|writer| {
             writer.write_sequence(|writer| {
@@ -66,9 +73,9 @@ pub mod pkcs8 {
         })
     }
 
-    pub fn write_public(
+    pub(crate) fn write_public(
         oids: &[Option<&ObjectIdentifier>],
-        body_writer: impl FnOnce(DERWriter),
+        body_writer: impl FnOnce(DERWriter<'_>),
     ) -> Vec<u8> {
         yasna::construct_der(|writer| {
             writer.write_sequence(|writer| {

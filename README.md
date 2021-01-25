@@ -6,8 +6,6 @@
 
 *[JSON Web Key (JWK)](https://tools.ietf.org/html/rfc7517#section-4.3) (de)serialization, generation, and conversion.*
 
-Note: requires rustc nightly >= 1.45 for conveniences around fixed-size arrays.
-
 **Goals**
 
 tl;dr: get keys into a format that can be used by other crates; be as safe as possible while doing so.

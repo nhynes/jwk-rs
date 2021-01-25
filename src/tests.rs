@@ -2,6 +2,8 @@ use super::*;
 
 use std::str::FromStr;
 
+use crate::byte_array::ByteArray;
+
 // Generated using https://mkjwk.org
 static P256_JWK_FIXTURE: &str = r#"{
         "kty": "EC",
@@ -40,29 +42,24 @@ fn deserialize_es256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key: box Key::EC {
+            key: Box::new(Key::EC {
                 // The parameters were decoded using a 10-liner Rust script.
                 curve: Curve::P256 {
-                    d: Some(
-                        [
-                            102, 130, 144, 246, 62, 29, 132, 128, 101, 49, 21, 107, 191, 228, 6,
-                            240, 255, 211, 246, 203, 173, 191, 127, 253, 229, 232, 168, 244, 203,
-                            105, 128, 168
-                        ]
-                        .into()
-                    ),
-                    x: [
+                    d: Some(ByteArray::from_slice(&[
+                        102, 130, 144, 246, 62, 29, 132, 128, 101, 49, 21, 107, 191, 228, 6, 240,
+                        255, 211, 246, 203, 173, 191, 127, 253, 229, 232, 168, 244, 203, 105, 128,
+                        168
+                    ])),
+                    x: ByteArray::from_slice(&[
                         64, 227, 7, 154, 255, 122, 181, 89, 73, 191, 235, 141, 170, 154, 231, 13,
                         34, 136, 143, 144, 34, 45, 53, 202, 70, 137, 151, 98, 118, 175, 208, 221
-                    ]
-                    .into(),
-                    y: [
+                    ]),
+                    y: ByteArray::from_slice(&[
                         78, 54, 25, 160, 121, 220, 181, 171, 68, 19, 163, 66, 172, 169, 151, 65,
                         210, 73, 62, 115, 115, 100, 69, 252, 156, 25, 153, 117, 237, 192, 99, 137
-                    ]
-                    .into(),
+                    ])
                 },
-            },
+            }),
             algorithm: Some(Algorithm::ES256),
             key_id: Some("a key".into()),
             key_ops: KeyOps::empty(),
@@ -74,13 +71,13 @@ fn deserialize_es256() {
 #[test]
 fn serialize_es256() {
     let jwk = JsonWebKey {
-        key: box Key::EC {
+        key: Box::new(Key::EC {
             curve: Curve::P256 {
                 d: None,
-                x: [1u8; 32].into(),
-                y: [2u8; 32].into(),
+                x: ByteArray::from_slice(&[1u8; 32]),
+                y: ByteArray::from_slice(&[2u8; 32]),
             },
-        },
+        }),
         key_id: None,
         algorithm: None,
         key_ops: KeyOps::empty(),
@@ -130,10 +127,10 @@ fn deserialize_hs256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key: box Key::Symmetric {
+            key: Box::new(Key::Symmetric {
                 // The parameters were decoded using a 10-liner Rust script.
                 key: vec![180, 3, 141, 233].into(),
-            },
+            }),
             algorithm: Some(Algorithm::HS256),
             key_id: None,
             key_ops: KeyOps::SIGN | KeyOps::VERIFY,
@@ -145,9 +142,9 @@ fn deserialize_hs256() {
 #[test]
 fn serialize_hs256() {
     let jwk = JsonWebKey {
-        key: box Key::Symmetric {
+        key: Box::new(Key::Symmetric {
             key: vec![42; 16].into(),
-        },
+        }),
         key_id: None,
         algorithm: None,
         key_ops: KeyOps::empty(),
@@ -165,7 +162,7 @@ fn deserialize_rs256() {
     assert_eq!(
         jwk,
         JsonWebKey {
-            key: box Key::RSA {
+            key: Box::new(Key::RSA {
                 public: RsaPublic {
                     e: PublicExponent,
                     n: vec![
@@ -223,7 +220,7 @@ fn deserialize_rs256() {
                         .into()
                     )
                 })
-            },
+            }),
             algorithm: None,
             key_id: None,
             key_ops: KeyOps::WRAP_KEY,
@@ -235,7 +232,7 @@ fn deserialize_rs256() {
 #[test]
 fn serialize_rs256() {
     let jwk = JsonWebKey {
-        key: box Key::RSA {
+        key: Box::new(Key::RSA {
             public: RsaPublic {
                 e: PublicExponent,
                 n: vec![105, 183, 62].into(),
@@ -248,7 +245,7 @@ fn serialize_rs256() {
                 dq: None,
                 qi: None,
             }),
-        },
+        }),
         key_id: None,
         algorithm: None,
         key_ops: KeyOps::empty(),

@@ -1,5 +1,5 @@
-#![allow(incomplete_features)]
-#![feature(box_syntax, const_generics, fixed_size_array)]
+#![deny(rust_2018_idioms, unreachable_pub)]
+#![forbid(unsafe_code)]
 
 //! *[JSON Web Key (JWK)](https://tools.ietf.org/html/rfc7517#section-4.3) (de)serialization, generation, and conversion.*
 //!
@@ -58,6 +58,9 @@
 //!                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
 //! * `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
 
+#[macro_use]
+extern crate serde;
+
 mod byte_array;
 mod byte_vec;
 mod key_ops;
@@ -67,6 +70,7 @@ mod utils;
 
 use std::borrow::Cow;
 
+use generic_array::typenum::U32;
 use serde::{Deserialize, Serialize};
 
 pub use byte_array::ByteArray;
@@ -94,7 +98,7 @@ pub struct JsonWebKey {
 impl JsonWebKey {
     pub fn new(key: Key) -> Self {
         Self {
-            key: box key,
+            key: Box::new(key),
             key_use: None,
             key_ops: KeyOps::empty(),
             key_id: None,
@@ -143,7 +147,7 @@ impl std::str::FromStr for JsonWebKey {
 }
 
 impl std::fmt::Display for JsonWebKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if f.alternate() {
             write!(f, "{}", serde_json::to_string_pretty(self).unwrap())
         } else {
@@ -179,7 +183,7 @@ pub enum Key {
 impl Key {
     /// Returns true iff this key only contains private components (i.e. a private asymmetric
     /// key or a symmetric key).
-    fn is_private(&self) -> bool {
+    pub fn is_private(&self) -> bool {
         match self {
             Self::Symmetric { .. }
             | Self::EC {
@@ -194,7 +198,7 @@ impl Key {
     }
 
     /// Returns the public part of this key (symmetric keys have no public parts).
-    pub fn to_public(&self) -> Option<Cow<Self>> {
+    pub fn to_public(&self) -> Option<Cow<'_, Self>> {
         if !self.is_private() {
             return Some(Cow::Borrowed(self));
         }
@@ -236,7 +240,7 @@ impl Key {
                 let prime256v1_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 3, 1, 7]);
                 let oids = &[Some(&ec_public_oid), Some(&prime256v1_oid)];
 
-                let write_public = |writer: DERWriter| {
+                let write_public = |writer: DERWriter<'_>| {
                     let public_bytes: Vec<u8> = [0x04 /* uncompressed */]
                         .iter()
                         .chain(x.iter())
@@ -248,7 +252,7 @@ impl Key {
 
                 match d {
                     Some(private_point) => {
-                        pkcs8::write_private(oids, |writer: &mut DERWriterSeq| {
+                        pkcs8::write_private(oids, |writer: &mut DERWriterSeq<'_>| {
                             writer.next().write_i8(1); // version
                             writer.next().write_bytes(&**private_point);
                             // The following tagged value is optional. OpenSSL produces it,
@@ -268,17 +272,17 @@ impl Key {
                     1, 2, 840, 113549, 1, 1, 1, // rsaEncryption
                 ]);
                 let oids = &[Some(&rsa_encryption_oid), None];
-                let write_bytevec = |writer: DERWriter, vec: &ByteVec| {
+                let write_bytevec = |writer: DERWriter<'_>, vec: &ByteVec| {
                     let bigint = BigUint::from_bytes_be(vec.as_slice());
                     writer.write_biguint(&bigint);
                 };
 
-                let write_public = |writer: &mut DERWriterSeq| {
+                let write_public = |writer: &mut DERWriterSeq<'_>| {
                     write_bytevec(writer.next(), &public.n);
                     writer.next().write_u32(PUBLIC_EXPONENT);
                 };
 
-                let write_private = |writer: &mut DERWriterSeq, private: &RsaPrivate| {
+                let write_private = |writer: &mut DERWriterSeq<'_>, private: &RsaPrivate| {
                     // https://tools.ietf.org/html/rfc3447#appendix-A.1.2
                     writer.next().write_i8(0); // version (two-prime)
                     write_public(writer);
@@ -389,8 +393,8 @@ impl Key {
         Self::EC {
             curve: Curve::P256 {
                 d: Some(sk_scalar.to_bytes().into()),
-                x: ByteArray::try_from_slice(x_bytes).unwrap(),
-                y: ByteArray::try_from_slice(y_bytes).unwrap(),
+                x: ByteArray::from_slice(x_bytes),
+                y: ByteArray::from_slice(y_bytes),
             },
         }
     }
@@ -404,11 +408,11 @@ pub enum Curve {
     P256 {
         /// The private scalar.
         #[serde(skip_serializing_if = "Option::is_none")]
-        d: Option<ByteArray<32>>,
+        d: Option<ByteArray<U32>>,
         /// The curve point x coordinate.
-        x: ByteArray<32>,
+        x: ByteArray<U32>,
         /// The curve point y coordinate.
-        y: ByteArray<32>,
+        y: ByteArray<U32>,
     },
 }
 
