@@ -64,6 +64,7 @@ fn deserialize_es256() {
             key_id: Some("a key".into()),
             key_ops: KeyOps::empty(),
             key_use: Some(KeyUse::Encryption),
+            x5: Default::default(),
         }
     );
 }
@@ -82,6 +83,7 @@ fn serialize_es256() {
         algorithm: None,
         key_ops: KeyOps::empty(),
         key_use: None,
+        x5: Default::default(),
     };
     assert_eq!(
         jwk.to_string(),
@@ -135,6 +137,7 @@ fn deserialize_hs256() {
             key_id: None,
             key_ops: KeyOps::SIGN | KeyOps::VERIFY,
             key_use: None,
+            x5: Default::default(),
         }
     );
 }
@@ -149,6 +152,7 @@ fn serialize_hs256() {
         algorithm: None,
         key_ops: KeyOps::empty(),
         key_use: None,
+        x5: Default::default(),
     };
     assert_eq!(
         jwk.to_string(),
@@ -225,6 +229,7 @@ fn deserialize_rs256() {
             key_id: None,
             key_ops: KeyOps::WRAP_KEY,
             key_use: Some(KeyUse::Encryption),
+            x5: Default::default(),
         }
     );
 }
@@ -250,6 +255,7 @@ fn serialize_rs256() {
         algorithm: None,
         key_ops: KeyOps::empty(),
         key_use: None,
+        x5: Default::default(),
     };
     assert_eq!(
         jwk.to_string(),
@@ -412,4 +418,32 @@ fn rsa_is_private() {
     let public_jwk = JsonWebKey::from_str(PUBLIC_RSA_JWK_FIXTURE).unwrap();
     assert!(!public_jwk.key.is_private());
     assert!(!public_jwk.key.to_public().unwrap().is_private());
+}
+
+#[test]
+fn x509_params() {
+    let private_jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    assert!(private_jwk.key.is_private());
+    assert!(!private_jwk.key.to_public().unwrap().is_private());
+
+    static X509_JWK_FIXTURE: &str = r#"{
+        "kty": "oct",
+        "k": "TdSBZdXL5n39JXlQc7QL3w",
+        "x5u": "https://example.com/testing.crt",
+        "x5c": "---BEGIN CERTIFICATE---...",
+        "x5t": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d",
+        "x5t#S256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    }"#;
+
+    let jwk = JsonWebKey::from_str(X509_JWK_FIXTURE).unwrap();
+    assert_eq!(jwk.x5.url.unwrap(), "https://example.com/testing.crt");
+    assert_eq!(jwk.x5.cert_chain.unwrap(), "---BEGIN CERTIFICATE---...");
+    assert_eq!(
+        jwk.x5.thumbprint.unwrap(),
+        "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+    );
+    assert_eq!(
+        jwk.x5.thumbprint_sha256.unwrap(),
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    );
 }

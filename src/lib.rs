@@ -93,6 +93,42 @@ pub struct JsonWebKey {
 
     #[serde(default, rename = "alg", skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<Algorithm>,
+
+    #[serde(default, flatten, skip_serializing_if = "X509Params::is_empty")]
+    pub x5: X509Params,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct X509Params {
+    /// x5u: The URL of the X.509 cert corresponding to this key.
+    #[serde(default, rename = "x5u", skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+
+    /// x5c: The certificate chain used to verify this key.
+    #[serde(default, rename = "x5c", skip_serializing_if = "Option::is_none")]
+    cert_chain: Option<String>,
+
+    /// x5t: The SHA-1 thumbprint of the DER-encoded X.509 version of the public key.
+    #[serde(default, rename = "x5t", skip_serializing_if = "Option::is_none")]
+    thumbprint: Option<String>,
+
+    /// x5t#S256: The same data as the thumbprint, but digested using SHA-256
+    #[serde(default, rename = "x5t#S256", skip_serializing_if = "Option::is_none")]
+    thumbprint_sha256: Option<String>,
+}
+
+impl X509Params {
+    fn is_empty(&self) -> bool {
+        matches!(
+            self,
+            X509Params {
+                url: None,
+                cert_chain: None,
+                thumbprint: None,
+                thumbprint_sha256: None,
+            }
+        )
+    }
 }
 
 impl JsonWebKey {
@@ -103,6 +139,7 @@ impl JsonWebKey {
             key_ops: KeyOps::empty(),
             key_id: None,
             algorithm: None,
+            x5: Default::default(),
         }
     }
 
@@ -184,17 +221,15 @@ impl Key {
     /// Returns true iff this key only contains private components (i.e. a private asymmetric
     /// key or a symmetric key).
     pub fn is_private(&self) -> bool {
-        match self {
-            Self::Symmetric { .. }
-            | Self::EC {
-                curve: Curve::P256 { d: Some(_), .. },
-                ..
-            }
-            | Self::RSA {
-                private: Some(_), ..
-            } => true,
-            _ => false,
+        matches!(self, Self::Symmetric { .. }
+        | Self::EC {
+            curve: Curve::P256 { d: Some(_), .. },
+            ..
         }
+        | Self::RSA {
+            private: Some(_), ..
+        }
+        )
     }
 
     /// Returns the public part of this key (symmetric keys have no public parts).
