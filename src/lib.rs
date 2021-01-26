@@ -58,9 +58,6 @@
 //!                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
 //! * `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
 
-#[macro_use]
-extern crate serde;
-
 mod byte_array;
 mod byte_vec;
 mod key_ops;
@@ -69,6 +66,7 @@ mod tests;
 mod utils;
 
 use std::borrow::Cow;
+use std::fmt;
 
 use generic_array::typenum::U32;
 use serde::{Deserialize, Serialize};
@@ -308,7 +306,7 @@ impl Key {
                 ]);
                 let oids = &[Some(&rsa_encryption_oid), None];
                 let write_bytevec = |writer: DERWriter<'_>, vec: &ByteVec| {
-                    let bigint = BigUint::from_bytes_be(vec.as_slice());
+                    let bigint = BigUint::from_bytes_be(&vec);
                     writer.write_biguint(&bigint);
                 };
 
@@ -435,7 +433,7 @@ impl Key {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "crv")]
 pub enum Curve {
     /// Parameters of the prime256v1 (P256) curve.
@@ -449,6 +447,18 @@ pub enum Curve {
         /// The curve point y coordinate.
         y: ByteArray<U32>,
     },
+}
+
+impl fmt::Debug for Curve {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::P256 { x, y, .. } => f
+                .debug_struct("Curve:P256")
+                .field("x", x)
+                .field("y", y)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -487,7 +497,7 @@ impl<'de> Deserialize<'de> for PublicExponent {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RsaPrivate {
     /// Private exponent.
     pub d: ByteVec,
@@ -506,6 +516,12 @@ pub struct RsaPrivate {
     /// First CRT coefficient.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub qi: Option<ByteVec>,
+}
+
+impl fmt::Debug for RsaPrivate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("RsaPrivate")
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

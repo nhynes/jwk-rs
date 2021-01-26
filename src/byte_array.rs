@@ -1,14 +1,22 @@
-use derive_more::{AsRef, Deref};
 use generic_array::{ArrayLength, GenericArray};
-use serde::de::{self, Deserialize, Deserializer};
+use serde::{
+    de::{self, Deserializer},
+    Deserialize, Serialize,
+};
 use zeroize::{Zeroize, Zeroizing};
 
 /// A zeroizing-on-drop container for a `[u8; N]` that deserializes from base64.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deref, AsRef)]
+#[derive(Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct ByteArray<N: ArrayLength<u8>>(
-    #[serde(serialize_with = "crate::utils::serde_base64::serialize")] pub GenericArray<u8, N>,
+    #[serde(serialize_with = "crate::utils::serde_base64::serialize")] GenericArray<u8, N>,
 );
+
+impl<N: ArrayLength<u8>> std::fmt::Debug for ByteArray<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&crate::utils::base64_encode(&self.0))
+    }
+}
 
 impl<N: ArrayLength<u8>, T: Into<GenericArray<u8, N>>> From<T> for ByteArray<N> {
     fn from(arr: T) -> Self {
@@ -19,6 +27,19 @@ impl<N: ArrayLength<u8>, T: Into<GenericArray<u8, N>>> From<T> for ByteArray<N> 
 impl<N: ArrayLength<u8>> Drop for ByteArray<N> {
     fn drop(&mut self) {
         Zeroize::zeroize(self.0.as_mut_slice())
+    }
+}
+
+impl<N: ArrayLength<u8>> AsRef<[u8]> for ByteArray<N> {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<N: ArrayLength<u8>> std::ops::Deref for ByteArray<N> {
+    type Target = [u8];
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -73,7 +94,7 @@ mod tests {
         let b64 = serde_json::to_string(&arr).unwrap();
         assert_eq!(b64, BASE64_JSON);
         let bytes: ByteArray<U7> = serde_json::from_str(&b64).unwrap();
-        assert_eq!(bytes.as_slice(), BYTES);
+        assert_eq!(bytes.as_ref(), BYTES);
     }
 
     #[test]
