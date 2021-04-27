@@ -430,7 +430,7 @@ fn x509_params() {
         "kty": "oct",
         "k": "TdSBZdXL5n39JXlQc7QL3w",
         "x5u": "https://example.com/testing.crt",
-        "x5c": "---BEGIN CERTIFICATE---...",
+        "x5c": ["---BEGIN CERTIFICATE---..."],
         "x5t": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d",
         "x5t#S256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
     }"#;

@@ -104,7 +104,7 @@ pub struct X509Params {
 
     /// x5c: The certificate chain used to verify this key.
     #[serde(default, rename = "x5c", skip_serializing_if = "Option::is_none")]
-    cert_chain: Option<String>,
+    cert_chain: Option<Vec<String>>,
 
     /// x5t: The SHA-1 thumbprint of the DER-encoded X.509 version of the public key.
     #[serde(default, rename = "x5t", skip_serializing_if = "Option::is_none")]
