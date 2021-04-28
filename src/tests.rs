@@ -437,7 +437,10 @@ fn x509_params() {
 
     let jwk = JsonWebKey::from_str(X509_JWK_FIXTURE).unwrap();
     assert_eq!(jwk.x5.url.unwrap(), "https://example.com/testing.crt");
-    assert_eq!(jwk.x5.cert_chain.unwrap(), "---BEGIN CERTIFICATE---...");
+    assert_eq!(
+        jwk.x5.cert_chain.unwrap(),
+        vec!["---BEGIN CERTIFICATE---..."]
+    );
     assert_eq!(
         jwk.x5.thumbprint.unwrap(),
         "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"

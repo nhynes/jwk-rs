@@ -65,8 +65,7 @@ mod key_ops;
 mod tests;
 mod utils;
 
-use std::borrow::Cow;
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 use generic_array::typenum::U32;
 use serde::{Deserialize, Serialize};
@@ -193,6 +192,7 @@ impl std::fmt::Display for JsonWebKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kty")]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Key {
     /// An elliptic curve, as per [RFC 7518 §6.2](https://tools.ietf.org/html/rfc7518#section-6.2).
     EC {
@@ -219,14 +219,17 @@ impl Key {
     /// Returns true iff this key only contains private components (i.e. a private asymmetric
     /// key or a symmetric key).
     pub fn is_private(&self) -> bool {
-        matches!(self, Self::Symmetric { .. }
-        | Self::EC {
-            curve: Curve::P256 { d: Some(_), .. },
-            ..
-        }
-        | Self::RSA {
-            private: Some(_), ..
-        }
+        matches!(
+            self,
+            Self::Symmetric { .. }
+                | Self::EC {
+                    curve: Curve::P256 { d: Some(_), .. },
+                    ..
+                }
+                | Self::RSA {
+                    private: Some(_),
+                    ..
+                }
         )
     }
 
@@ -533,6 +536,7 @@ pub enum KeyUse {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Algorithm {
     HS256,
     RS256,
@@ -543,12 +547,12 @@ pub enum Algorithm {
 const _IMPL_JWT_CONVERSIONS: () = {
     use jsonwebtoken as jwt;
 
-    impl Into<jwt::Algorithm> for Algorithm {
-        fn into(self) -> jsonwebtoken::Algorithm {
-            match self {
-                Self::HS256 => jwt::Algorithm::HS256,
-                Self::ES256 => jwt::Algorithm::ES256,
-                Self::RS256 => jwt::Algorithm::RS256,
+    impl From<Algorithm> for jwt::Algorithm {
+        fn from(alg: Algorithm) -> Self {
+            match alg {
+                Algorithm::HS256 => Self::HS256,
+                Algorithm::ES256 => Self::ES256,
+                Algorithm::RS256 => Self::RS256,
             }
         }
     }
