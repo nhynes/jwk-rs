@@ -1,6 +1,6 @@
 [package]
 name = "jsonwebkey"
-version = "0.3.2"
+version = "0.3.4"
 authors = ["Nick Hynes <nhynes@nhynes.com>"]
 description = "JSON Web Key (JWK) (de)serialization, generation, and conversion."
 readme = "README.md"
@@ -10,18 +10,18 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-base64        = "0.12"
+base64        = "0.13"
 bitflags      = "1.2"
 generic-array = "0.14"
 jsonwebtoken  = { version = "7.2", optional = true }
-num-bigint    = { version = "0.2", optional = true }
-p256          = { version = "0.3", optional = true }
-rand          = { version = "0.7", optional = true }
+num-bigint    = { version = "0.4", optional = true }
+p256          = { version = "0.9", optional = true, features = ["arithmetic"] }
+rand          = { version = "0.8", optional = true }
 serde         = { version = "1.0", features = ["derive"] }
 serde_json    = "1.0"
 thiserror     = "1.0"
-yasna         = { version = "0.3", optional = true, features = ["num-bigint"] }
-zeroize       = { version = "1.1", features = ["zeroize_derive"] }
+yasna         = { version = "0.4", optional = true, features = ["num-bigint"] }
+zeroize       = { version = "1.4", features = ["zeroize_derive"] }
 
 [features]
 pkcs-convert = ["num-bigint", "yasna"]

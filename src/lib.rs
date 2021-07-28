@@ -410,20 +410,16 @@ impl Key {
     /// Used with the ES256 algorithm.
     #[cfg(feature = "generate")]
     pub fn generate_p256() -> Self {
-        use p256::elliptic_curve::generic_array::GenericArray;
-        use rand::RngCore;
+        use p256::elliptic_curve::{self as elliptic_curve, sec1::ToEncodedPoint};
 
-        let mut sk_bytes = GenericArray::default();
-        rand::thread_rng().fill_bytes(&mut sk_bytes);
-        let sk = p256::SecretKey::new(sk_bytes);
-        let sk_scalar = p256::arithmetic::Scalar::from_secret(sk).unwrap();
+        let sk = elliptic_curve::SecretKey::random(&mut rand::thread_rng());
+        let sk_scalar = p256::Scalar::from(&sk);
 
-        let pk = p256::arithmetic::ProjectivePoint::generator() * &sk_scalar;
+        let pk = p256::ProjectivePoint::generator() * sk_scalar;
         let pk_bytes = &pk
             .to_affine()
-            .unwrap()
-            .to_uncompressed_pubkey()
-            .into_bytes()[1..];
+            .to_encoded_point(false /* compress */)
+            .to_bytes()[1..];
         let (x_bytes, y_bytes) = pk_bytes.split_at(32);
 
         Self::EC {
