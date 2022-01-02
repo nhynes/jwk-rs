@@ -45,7 +45,7 @@ pub(crate) mod pkcs8 {
         DERWriter, DERWriterSeq,
     };
 
-    fn write_oids(writer: &mut DERWriterSeq<'_>, oids: &[Option<&ObjectIdentifier>]) {
+    pub(crate) fn write_oids(writer: &mut DERWriterSeq<'_>, oids: &[Option<&ObjectIdentifier>]) {
         for oid in oids {
             match oid {
                 Some(oid) => writer.next().write_oid(oid),

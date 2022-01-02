@@ -30,6 +30,13 @@ static RSA_JWK_FIXTURE: &str = r#"{
         "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
     }"#;
 
+static ED25519_JWK_FIXTURE: &str = r#"{
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "d": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A"
+    }"#;
+
 #[cfg(feature = "pkcs-convert")]
 static OCT_FIXTURE: &str = r#"{
         "kty": "oct",
@@ -88,6 +95,55 @@ fn serialize_es256() {
     assert_eq!(
         jwk.to_string(),
         r#"{"kty":"EC","crv":"P-256","x":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE","y":"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"}"#
+    );
+}
+
+#[test]
+fn deserialize_ed25519() {
+    let jwk = JsonWebKey::from_str(ED25519_JWK_FIXTURE).unwrap();
+    assert_eq!(
+        jwk,
+        JsonWebKey {
+            key: Box::new(Key::OKP {
+                // The parameters were decoded using a base64url to UInt8Array converter function
+                curve: Curve::ED25519 {
+                    d: Some(ByteArray::from_slice(&[
+                        157, 97, 177, 157, 239, 253, 90, 96, 186, 132, 74, 244, 146, 236, 44, 196,
+                        68, 73, 197, 105, 123, 50, 105, 25, 112, 59, 172, 3, 28, 174, 127, 96
+                    ])),
+                    x: ByteArray::from_slice(&[
+                        215, 90, 152, 1, 130, 177, 10, 183, 213, 75, 254, 211, 201, 100, 7, 58, 14,
+                        225, 114, 243, 218, 166, 35, 37, 175, 2, 26, 104, 247, 7, 81, 26
+                    ])
+                },
+            }),
+            algorithm: None,
+            key_id: None,
+            key_ops: KeyOps::empty(),
+            key_use: None,
+            x5: Default::default(),
+        }
+    );
+}
+
+#[test]
+fn serialize_ed25519() {
+    let jwk = JsonWebKey {
+        key: Box::new(Key::OKP {
+            curve: Curve::ED25519 {
+                d: Some(ByteArray::from_slice(&[1u8; 32])),
+                x: ByteArray::from_slice(&[2u8; 32]),
+            },
+        }),
+        key_id: None,
+        algorithm: None,
+        key_ops: KeyOps::empty(),
+        key_use: None,
+        x5: Default::default(),
+    };
+    assert_eq!(
+        jwk.to_string(),
+        r#"{"kty":"OKP","crv":"Ed25519","d":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE","x":"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"}"#
     );
 }
 
@@ -301,6 +357,34 @@ fn mismatched_algorithm() {
 
 #[cfg(feature = "pkcs-convert")]
 #[test]
+fn ed25519_private_to_pem() {
+    let jwk = JsonWebKey::from_str(ED25519_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        jwk.key.to_pem(),
+        "-----BEGIN PRIVATE KEY-----
+MC4CAQEwBQYDK2VwBCIEIJ1hsZ3v/VpguoRK9JLsLMREScVpezJpGXA7rAMcrn9g
+-----END PRIVATE KEY-----
+"
+    );
+}
+
+#[cfg(feature = "pkcs-convert")]
+#[test]
+fn ed25519_public_to_pem() {
+    let jwk = JsonWebKey::from_str(ED25519_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
+    assert_eq!(
+        jwk.key.to_public().unwrap().to_pem(),
+        "-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=
+-----END PUBLIC KEY-----
+"
+    );
+}
+
+#[cfg(feature = "pkcs-convert")]
+#[test]
 fn p256_private_to_pem() {
     // generated using mkjwk, converted using node-jwk-to-pem, verified using openssl
     let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE).unwrap();
@@ -356,6 +440,7 @@ J2lmylxUG0M=
 #[test]
 fn rsa_public_to_pem() {
     let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    #[rustfmt::skip]
     assert_eq!(
         jwk.key.to_public().unwrap().to_pem(),
         "-----BEGIN PUBLIC KEY-----
@@ -397,6 +482,19 @@ fn ec_is_private() {
     assert!(!private_jwk.key.to_public().unwrap().is_private());
     let mut k: serde_json::Map<String, serde_json::Value> =
         serde_json::from_str(P256_JWK_FIXTURE).unwrap();
+    k.remove("d");
+    let public_jwk = JsonWebKey::from_str(&serde_json::to_string(&k).unwrap()).unwrap();
+    assert!(!public_jwk.key.is_private());
+    assert!(!public_jwk.key.to_public().unwrap().is_private());
+}
+
+#[test]
+fn okp_is_private() {
+    let private_jwk = JsonWebKey::from_str(ED25519_JWK_FIXTURE).unwrap();
+    assert!(private_jwk.key.is_private());
+    assert!(!private_jwk.key.to_public().unwrap().is_private());
+    let mut k: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(ED25519_JWK_FIXTURE).unwrap();
     k.remove("d");
     let public_jwk = JsonWebKey::from_str(&serde_json::to_string(&k).unwrap()).unwrap();
     assert!(!public_jwk.key.is_private());
