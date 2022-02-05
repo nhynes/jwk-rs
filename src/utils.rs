@@ -33,7 +33,7 @@ pub(crate) mod serde_base64 {
             let err_msg = e.to_string().to_lowercase();
             #[cfg(not(debug_assertions))]
             let err_msg = "invalid base64";
-            de::Error::custom(err_msg.strip_suffix(".").unwrap_or(&err_msg))
+            de::Error::custom(err_msg.strip_suffix('.').unwrap_or(&err_msg))
         })
     }
 }

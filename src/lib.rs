@@ -313,7 +313,7 @@ impl Key {
                 ]);
                 let oids = &[Some(&rsa_encryption_oid), None];
                 let write_bytevec = |writer: DERWriter<'_>, vec: &ByteVec| {
-                    let bigint = BigUint::from_bytes_be(&vec);
+                    let bigint = BigUint::from_bytes_be(vec);
                     writer.write_biguint(&bigint);
                 };
 
