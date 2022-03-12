@@ -319,7 +319,7 @@ impl Key {
                     Some(private_key) => {
                         yasna::construct_der(|writer| {
                             writer.write_sequence(|writer| {
-                                writer.next().write_i8(1);
+                                writer.next().write_i8(0);
                                 writer
                                     .next()
                                     .write_sequence(|writer| pkcs8::write_oids(writer, oids));
