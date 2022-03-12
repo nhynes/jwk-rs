@@ -160,6 +160,12 @@ impl JsonWebKey {
                     curve: Curve::P256 { .. },
                 },
             )
+            | (
+                EdDSA,
+                OKP {
+                    curve: Curve::ED25519 { .. },
+                },
+            )
             | (RS256, RSA { .. })
             | (HS256, Symmetric { .. }) => Ok(()),
             _ => Err(Error::MismatchedAlgorithm),
@@ -199,6 +205,11 @@ pub enum Key {
         #[serde(flatten)]
         curve: Curve,
     },
+    /// An elliptic curve, as per [RFC 7518 §6.2](https://tools.ietf.org/html/rfc7518#section-6.2).
+    OKP {
+        #[serde(flatten)]
+        curve: Curve,
+    },
     /// An elliptic curve, as per [RFC 7518 §6.3](https://tools.ietf.org/html/rfc7518#section-6.3).
     /// See also: [RFC 3447](https://tools.ietf.org/html/rfc3447).
     RSA {
@@ -224,6 +235,10 @@ impl Key {
             Self::Symmetric { .. }
                 | Self::EC {
                     curve: Curve::P256 { d: Some(_), .. },
+                    ..
+                }
+                | Self::OKP {
+                    curve: Curve::ED25519 { d: Some(_), .. },
                     ..
                 }
                 | Self::RSA {
@@ -253,6 +268,20 @@ impl Key {
                 public: public.clone(),
                 private: None,
             },
+            Self::OKP {
+                curve: Curve::ED25519 { x, .. },
+            } => Self::OKP {
+                curve: Curve::ED25519 {
+                    x: x.clone(),
+                    d: None,
+                },
+            },
+            Key::EC {
+                curve: Curve::ED25519 { .. },
+            } => return None,
+            Key::OKP {
+                curve: Curve::P256 { .. },
+            } => return None,
         }))
     }
 
@@ -264,11 +293,52 @@ impl Key {
 
         use crate::utils::pkcs8;
 
-        if let Self::Symmetric { .. } = self {
-            return Err(ConversionError::NotAsymmetric);
+        match self {
+            Self::Symmetric { .. } => return Err(ConversionError::NotAsymmetric),
+            Self::EC {
+                curve: Curve::ED25519 { .. },
+            } => return Err(ConversionError::InvalidCombination),
+            Self::OKP {
+                curve: Curve::P256 { .. },
+            } => return Err(ConversionError::InvalidCombination),
+            _ => {}
         }
 
         Ok(match self {
+            Self::OKP {
+                curve: Curve::ED25519 { d, x },
+            } => {
+                let ed25519_oid = ObjectIdentifier::from_slice(&[1, 3, 101, 112]);
+                let oids = &[Some(&ed25519_oid)];
+
+                let write_public = |writer: DERWriter<'_>| {
+                    writer.write_bitvec_bytes(&x, 8 * 32);
+                };
+
+                match d {
+                    Some(private_key) => {
+                        yasna::construct_der(|writer| {
+                            writer.write_sequence(|writer| {
+                                writer.next().write_i8(0);
+                                writer
+                                    .next()
+                                    .write_sequence(|writer| pkcs8::write_oids(writer, oids));
+
+                                let body = yasna::construct_der(|writer| {
+                                    writer.write_bytes(&**private_key)
+                                });
+                                writer.next().write_bytes(&body);
+                                // no public key, OpenSSL does not support RFC5958 yet
+                                // https://github.com/openssl/openssl/issues/14015
+                                // https://github.com/openssl/openssl/issues/10468
+                                // https://github.com/openssl/openssl/issues/9134
+                                // writer.next().write_tagged(Tag::context(1), write_public);
+                            });
+                        })
+                    }
+                    None => pkcs8::write_public(oids, write_public),
+                }
+            }
             Self::EC {
                 curve: Curve::P256 { d, x, y },
             } => {
@@ -353,6 +423,12 @@ impl Key {
                 }
             }
             Self::Symmetric { .. } => unreachable!("checked above"),
+            Self::EC {
+                curve: Curve::ED25519 { .. },
+            } => unreachable!("checked above"),
+            Self::OKP {
+                curve: Curve::P256 { .. },
+            } => unreachable!("checked above"),
         })
     }
 
@@ -446,6 +522,14 @@ pub enum Curve {
         /// The curve point y coordinate.
         y: ByteArray<U32>,
     },
+    #[serde(rename = "Ed25519")]
+    ED25519 {
+        /// The private key / seed
+        #[serde(skip_serializing_if = "Option::is_none")]
+        d: Option<ByteArray<U32>>,
+        /// The public key
+        x: ByteArray<U32>,
+    },
 }
 
 impl fmt::Debug for Curve {
@@ -456,6 +540,14 @@ impl fmt::Debug for Curve {
                 .field("x", x)
                 .field("y", y)
                 .finish(),
+            Self::ED25519 { x, d } => {
+                let mut debug_struct = f.debug_struct("Curve:Ed25519");
+                debug_struct.field("x", x);
+                if let Some(private_key) = d {
+                    debug_struct.field("d", private_key);
+                }
+                debug_struct.finish()
+            }
         }
     }
 }
@@ -537,6 +629,7 @@ pub enum Algorithm {
     HS256,
     RS256,
     ES256,
+    EdDSA,
 }
 
 #[cfg(feature = "jwt-convert")]
@@ -549,6 +642,7 @@ const _IMPL_JWT_CONVERSIONS: () = {
                 Algorithm::HS256 => Self::HS256,
                 Algorithm::ES256 => Self::ES256,
                 Algorithm::RS256 => Self::RS256,
+                Algorithm::EdDSA => panic!("{:?}", ConversionError::NotSupported), // jsonwebtoken supports EdDSA in versions 8+
             }
         }
     }
@@ -568,6 +662,9 @@ const _IMPL_JWT_CONVERSIONS: () = {
                 }
                 Self::RSA { .. } => {
                     jwt::EncodingKey::from_rsa_pem(self.try_to_pem()?.as_bytes()).unwrap()
+                }
+                Self::OKP { .. } => {
+                    panic!("{:?}", ConversionError::NotSupported) // jsonwebtoken supports EdDSA in versions 8+
                 }
             })
         }
@@ -591,6 +688,7 @@ const _IMPL_JWT_CONVERSIONS: () = {
                 Self::RSA { .. } => jwt::DecodingKey::from_rsa_pem(self.to_pem().as_bytes())
                     .unwrap()
                     .into_static(),
+                Self::OKP { .. } => panic!("{:?}", ConversionError::NotSupported), // jsonwebtoken supports EdDSA in versions 8+
             }
         }
     }
@@ -619,4 +717,10 @@ pub enum ConversionError {
     #[cfg(feature = "jwt-convert")]
     #[error("a public key cannot be converted to a `jsonwebtoken::EncodingKey`")]
     NotPrivate,
+
+    #[error("key type is not supported")]
+    NotSupported,
+
+    #[error("invalid combination of key type and curve")]
+    InvalidCombination,
 }
