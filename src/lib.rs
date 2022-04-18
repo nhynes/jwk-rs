@@ -592,7 +592,7 @@ impl fmt::Debug for RsaPrivate {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum KeyUse {
     #[serde(rename = "sig")]
     Signing,
@@ -600,7 +600,7 @@ pub enum KeyUse {
     Encryption,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum Algorithm {
     HS256,
