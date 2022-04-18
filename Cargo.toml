@@ -13,14 +13,14 @@ edition = "2018"
 base64        = "0.13"
 bitflags      = "1.2"
 generic-array = "0.14"
-jsonwebtoken  = { version = "8.0", optional = true }
+jsonwebtoken  = { version = "8.1", optional = true }
 num-bigint    = { version = "0.4", optional = true }
-p256          = { version = "0.9", optional = true, features = ["arithmetic"] }
+p256          = { version = "0.10", optional = true, features = ["arithmetic"] }
 rand          = { version = "0.8", optional = true }
 serde         = { version = "1.0", features = ["derive"] }
 serde_json    = "1.0"
 thiserror     = "1.0"
-yasna         = { version = "0.4", optional = true, features = ["num-bigint"] }
+yasna         = { version = "0.5", optional = true, features = ["num-bigint"] }
 zeroize       = { version = "1.4", features = ["zeroize_derive"] }
 
 [features]
@@ -29,7 +29,7 @@ jwt-convert  = ["pkcs-convert", "jsonwebtoken"]
 generate     = ["p256", "rand"]
 
 [dev-dependencies]
-jsonwebtoken = "8.0"
+jsonwebtoken = "8.1"
 
 [package.metadata.docs.rs]
 all-features = true
