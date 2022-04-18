@@ -71,7 +71,7 @@ mod utils;
 
 use std::{borrow::Cow, fmt};
 
-use generic_array::typenum::U32;
+use generic_array::typenum::{U32, U48};
 use serde::{Deserialize, Serialize};
 
 pub use byte_array::ByteArray;
@@ -164,8 +164,18 @@ impl JsonWebKey {
                     curve: Curve::P256 { .. },
                 },
             )
+            | (
+                ES384,
+                EC {
+                    curve: Curve::P384 { .. },
+                },
+            )
             | (RS256, RSA { .. })
+            | (RS384, RSA { .. })
+            | (RS512, RSA { .. })
             | (HS256, Symmetric { .. }) => Ok(()),
+            (HS384, Symmetric { .. }) => Ok(()),
+            (HS512, Symmetric { .. }) => Ok(()),
             _ => Err(Error::MismatchedAlgorithm),
         }
     }
@@ -230,6 +240,10 @@ impl Key {
                     curve: Curve::P256 { d: Some(_), .. },
                     ..
                 }
+                | Self::EC {
+                    curve: Curve::P384 { d: Some(_), .. },
+                    ..
+                }
                 | Self::RSA {
                     private: Some(_),
                     ..
@@ -248,6 +262,15 @@ impl Key {
                 curve: Curve::P256 { x, y, .. },
             } => Self::EC {
                 curve: Curve::P256 {
+                    x: x.clone(),
+                    y: y.clone(),
+                    d: None,
+                },
+            },
+            Self::EC {
+                curve: Curve::P384 { x, y, .. },
+            } => Self::EC {
+                curve: Curve::P384 {
                     x: x.clone(),
                     y: y.clone(),
                     d: None,
@@ -301,6 +324,34 @@ impl Key {
                             // writer.next().write_tagged(Tag::context(0), |writer| {
                             //     writer.write_oid(&prime256v1_oid)
                             // });
+                            writer.next().write_tagged(Tag::context(1), write_public);
+                        })
+                    }
+                    None => pkcs8::write_public(oids, write_public),
+                }
+            }
+            Self::EC {
+                curve: Curve::P384 { d, x, y },
+            } => {
+                let ec_public_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 2, 1]);
+                let prime384v1_oid = ObjectIdentifier::from_slice(&[1, 3, 132, 0, 34]);
+                let oids = &[Some(&ec_public_oid), Some(&prime384v1_oid)];
+
+                let write_public = |writer: DERWriter<'_>| {
+                    let public_bytes: Vec<u8> = [0x04 /* uncompressed */]
+                        .iter()
+                        .chain(x.iter())
+                        .chain(y.iter())
+                        .copied()
+                        .collect();
+                    writer.write_bitvec_bytes(&public_bytes, 8 * (48 * 2 + 1));
+                };
+
+                match d {
+                    Some(private_point) => {
+                        pkcs8::write_private(oids, |writer: &mut DERWriterSeq<'_>| {
+                            writer.next().write_i8(1); // version
+                            writer.next().write_bytes(&**private_point);
                             writer.next().write_tagged(Tag::context(1), write_public);
                         })
                     }
@@ -448,13 +499,29 @@ pub enum Curve {
         /// The curve point y coordinate.
         y: ByteArray<U32>,
     },
+    /// Parameters of the prime384v1 (P384) curve.
+    #[serde(rename = "P-384")]
+    P384 {
+        /// The private scalar.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        d: Option<ByteArray<U48>>,
+        /// The curve point x coordinate.
+        x: ByteArray<U48>,
+        /// The curve point y coordinate.
+        y: ByteArray<U48>,
+    },
 }
 
 impl fmt::Debug for Curve {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::P256 { x, y, .. } => f
-                .debug_struct("Curve:P256")
+                .debug_struct("Curve::P256")
+                .field("x", x)
+                .field("y", y)
+                .finish(),
+            Self::P384 { x, y, .. } => f
+                .debug_struct("Curve::P384")
                 .field("x", x)
                 .field("y", y)
                 .finish(),
@@ -537,8 +604,13 @@ pub enum KeyUse {
 #[allow(clippy::upper_case_acronyms)]
 pub enum Algorithm {
     HS256,
+    HS384,
+    HS512,
     RS256,
+    RS384,
+    RS512,
     ES256,
+    ES384,
 }
 
 #[cfg(feature = "jwt-convert")]
@@ -549,8 +621,13 @@ const _IMPL_JWT_CONVERSIONS: () = {
         fn from(alg: Algorithm) -> Self {
             match alg {
                 Algorithm::HS256 => Self::HS256,
+                Algorithm::HS384 => Self::HS384,
+                Algorithm::HS512 => Self::HS512,
                 Algorithm::ES256 => Self::ES256,
+                Algorithm::ES384 => Self::ES384,
                 Algorithm::RS256 => Self::RS256,
+                Algorithm::RS384 => Self::RS384,
+                Algorithm::RS512 => Self::RS512,
             }
         }
     }
