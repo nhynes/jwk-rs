@@ -85,7 +85,7 @@ mod tests {
     static BASE64_JSON: &str = "\"AQIDBAUGBw\"";
 
     fn get_de() -> serde_json::Deserializer<serde_json::de::StrRead<'static>> {
-        serde_json::Deserializer::from_str(&BASE64_JSON)
+        serde_json::Deserializer::from_str(BASE64_JSON)
     }
 
     #[test]

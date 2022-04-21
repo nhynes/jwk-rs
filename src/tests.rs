@@ -97,7 +97,9 @@ fn generate_p256() {
     extern crate jsonwebtoken as jwt;
 
     #[derive(Serialize, Deserialize)]
-    struct TokenClaims {}
+    struct TokenClaims {
+        exp: usize,
+    }
 
     let mut the_jwk = JsonWebKey::new(Key::generate_p256());
     the_jwk.set_algorithm(Algorithm::ES256).unwrap();
@@ -105,7 +107,7 @@ fn generate_p256() {
     let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der());
     let token = jwt::encode(
         &jwt::Header::new(the_jwk.algorithm.unwrap().into()),
-        &TokenClaims {},
+        &TokenClaims { exp: 0 },
         &encoding_key,
     )
     .unwrap();

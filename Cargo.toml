@@ -13,7 +13,7 @@ edition = "2018"
 base64        = "0.13"
 bitflags      = "1.2"
 generic-array = "0.14"
-jsonwebtoken  = { version = "7.2", optional = true }
+jsonwebtoken  = { version = "8.0", optional = true }
 num-bigint    = { version = "0.4", optional = true }
 p256          = { version = "0.9", optional = true, features = ["arithmetic"] }
 rand          = { version = "0.8", optional = true }
@@ -29,7 +29,7 @@ jwt-convert  = ["pkcs-convert", "jsonwebtoken"]
 generate     = ["p256", "rand"]
 
 [dev-dependencies]
-jsonwebtoken = "7.2"
+jsonwebtoken = "8.0"
 
 [package.metadata.docs.rs]
 all-features = true
