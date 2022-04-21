@@ -44,7 +44,9 @@ extern crate jsonwebtoken as jwt;
 extern crate jsonwebkey as jwk;
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct TokenClaims {}
+struct TokenClaims {
+   exp: usize
+}
 
 let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256());
 my_jwk.set_algorithm(jwk::Algorithm::ES256);
@@ -52,7 +54,7 @@ my_jwk.set_algorithm(jwk::Algorithm::ES256);
 let alg: jwt::Algorithm = my_jwk.algorithm.unwrap().into();
 let token = jwt::encode(
     &jwt::Header::new(alg),
-    &TokenClaims {},
+    &TokenClaims { exp: 1492 },
     &my_jwk.key.to_encoding_key(),
 ).unwrap();
 
