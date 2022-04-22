@@ -417,7 +417,7 @@ impl Key {
         let sk = elliptic_curve::SecretKey::random(&mut rand::thread_rng());
         let sk_scalar = p256::Scalar::from(&sk);
 
-        let pk = p256::ProjectivePoint::generator() * sk_scalar;
+        let pk = p256::ProjectivePoint::GENERATOR * sk_scalar;
         let pk_bytes = &pk
             .to_affine()
             .to_encoded_point(false /* compress */)
