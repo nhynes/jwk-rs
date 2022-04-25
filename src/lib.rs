@@ -161,7 +161,7 @@ impl JsonWebKey {
             (
                 ES256,
                 EC {
-                    curve: Curve::P256 { .. },
+                    curve: Curve::P256, ..
                 },
             )
             | (RS256, RSA { .. })
@@ -200,8 +200,14 @@ impl std::fmt::Display for JsonWebKey {
 pub enum Key {
     /// An elliptic curve, as per [RFC 7518 §6.2](https://tools.ietf.org/html/rfc7518#section-6.2).
     EC {
-        #[serde(flatten)]
+        #[serde(rename = "crv")]
         curve: Curve,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        d: Option<ByteArray<U32>>,
+        /// The curve point x coordinate.
+        x: ByteArray<U32>,
+        /// The curve point y coordinate.
+        y: ByteArray<U32>,
     },
     /// An elliptic curve, as per [RFC 7518 §6.3](https://tools.ietf.org/html/rfc7518#section-6.3).
     /// See also: [RFC 3447](https://tools.ietf.org/html/rfc3447).
@@ -219,6 +225,51 @@ pub enum Key {
     },
 }
 
+#[cfg(feature = "thumbprint")]
+impl Key {
+    /// The JWK thumbprint, as per [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638),
+    /// using SHA-256 as the hash function.
+    pub fn thumbprint(&self) -> String {
+        self.try_thumbprint_using_hasher::<sha2::Sha256>().unwrap()
+    }
+
+    /// The JWK thumbprint, as per [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638),
+    /// using the provided hash function.
+    pub fn try_thumbprint_using_hasher<H: sha2::digest::Digest>(
+        &self,
+    ) -> Result<String, serde_json::Error> {
+        use serde::ser::{SerializeStruct, Serializer};
+        let mut s = serde_json::Serializer::new(Vec::new());
+        match self {
+            Self::EC { curve, x, y, .. } => {
+                let mut ss = s.serialize_struct("", 4)?;
+                ss.serialize_field("crv", curve.name())?;
+                ss.serialize_field("kty", "EC")?;
+                ss.serialize_field("x", x)?;
+                ss.serialize_field("y", y)?;
+                ss.end()?;
+            }
+            Self::RSA {
+                public: RsaPublic { e, n },
+                ..
+            } => {
+                let mut ss = s.serialize_struct("", 3)?;
+                ss.serialize_field("e", e)?;
+                ss.serialize_field("kty", "RSA")?;
+                ss.serialize_field("n", n)?;
+                ss.end()?;
+            }
+            Self::Symmetric { key } => {
+                let mut ss = s.serialize_struct("", 2)?;
+                ss.serialize_field("k", key)?;
+                ss.serialize_field("kty", "oct")?;
+                ss.end()?;
+            }
+        }
+        Ok(crate::utils::base64_encode(H::digest(s.into_inner())))
+    }
+}
+
 impl Key {
     /// Returns true iff this key only contains private components (i.e. a private asymmetric
     /// key or a symmetric key).
@@ -226,10 +277,7 @@ impl Key {
         matches!(
             self,
             Self::Symmetric { .. }
-                | Self::EC {
-                    curve: Curve::P256 { d: Some(_), .. },
-                    ..
-                }
+                | Self::EC { d: Some(_), .. }
                 | Self::RSA {
                     private: Some(_),
                     ..
@@ -244,14 +292,11 @@ impl Key {
         }
         Some(Cow::Owned(match self {
             Self::Symmetric { .. } => return None,
-            Self::EC {
-                curve: Curve::P256 { x, y, .. },
-            } => Self::EC {
-                curve: Curve::P256 {
-                    x: x.clone(),
-                    y: y.clone(),
-                    d: None,
-                },
+            Self::EC { curve, x, y, .. } => Self::EC {
+                curve: *curve,
+                x: x.clone(),
+                y: y.clone(),
+                d: None,
             },
             Self::RSA { public, .. } => Self::RSA {
                 public: public.clone(),
@@ -273,9 +318,7 @@ impl Key {
         }
 
         Ok(match self {
-            Self::EC {
-                curve: Curve::P256 { d, x, y },
-            } => {
+            Self::EC { d, x, y, .. } => {
                 let ec_public_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 2, 1]);
                 let prime256v1_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 3, 1, 7]);
                 let oids = &[Some(&ec_public_oid), Some(&prime256v1_oid)];
@@ -425,40 +468,32 @@ impl Key {
         let (x_bytes, y_bytes) = pk_bytes.split_at(32);
 
         Self::EC {
-            curve: Curve::P256 {
-                d: Some(sk_scalar.to_bytes().into()),
-                x: ByteArray::from_slice(x_bytes),
-                y: ByteArray::from_slice(y_bytes),
-            },
+            curve: Curve::P256,
+            d: Some(sk_scalar.to_bytes().into()),
+            x: ByteArray::from_slice(x_bytes),
+            y: ByteArray::from_slice(y_bytes),
         }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "crv")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Curve {
-    /// Parameters of the prime256v1 (P256) curve.
+    /// The prime256v1 (P256) curve.
     #[serde(rename = "P-256")]
-    P256 {
-        /// The private scalar.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        d: Option<ByteArray<U32>>,
-        /// The curve point x coordinate.
-        x: ByteArray<U32>,
-        /// The curve point y coordinate.
-        y: ByteArray<U32>,
-    },
+    P256,
 }
 
-impl fmt::Debug for Curve {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Curve {
+    pub fn name(&self) -> &'static str {
         match self {
-            Self::P256 { x, y, .. } => f
-                .debug_struct("Curve:P256")
-                .field("x", x)
-                .field("y", y)
-                .finish(),
+            Self::P256 => "P-256",
         }
+    }
+}
+
+impl fmt::Display for Curve {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
     }
 }
 
@@ -539,6 +574,16 @@ pub enum Algorithm {
     HS256,
     RS256,
     ES256,
+}
+
+impl Algorithm {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::HS256 => "hs256",
+            Self::RS256 => "rs256",
+            Self::ES256 => "es256",
+        }
+    }
 }
 
 #[cfg(feature = "jwt-convert")]
