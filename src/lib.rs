@@ -581,12 +581,33 @@ impl fmt::Debug for RsaPrivate {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum KeyUse {
-    #[serde(rename = "sig")]
     Signing,
-    #[serde(rename = "enc")]
     Encryption,
+    Custom(String),
+}
+
+impl Serialize for KeyUse {
+    fn serialize<S: serde::ser::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Self::Signing => "sig",
+            Self::Encryption => "enc",
+            Self::Custom(u) => u.as_str(),
+        }
+            .serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for KeyUse {
+    fn deserialize<D: serde::de::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(match <&'de str>::deserialize(d)? {
+            "sig" => Self::Signing,
+            "enc" => Self::Encryption,
+            u => Self::Custom(u.into()),
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

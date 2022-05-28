@@ -20,6 +20,17 @@ static P256_JWK_FIXTURE: &str = r#"{
         "alg": "ES256"
     }"#;
 
+static P256_JWK_FIXTURE_OTHER_USE: &str = r#"{
+        "kty": "EC",
+        "d": "ZoKQ9j4dhIBlMRVrv-QG8P_T9sutv3_95eio9MtpgKg",
+        "use": "jwt-svid",
+        "crv": "P-256",
+        "kid": "a key",
+        "x": "QOMHmv96tVlJv-uNqprnDSKIj5AiLTXKRomXYnav0N0",
+        "y": "TjYZoHnctatEE6NCrKmXQdJJPnNzZEX8nBmZde3AY4k",
+        "alg": "ES256"
+    }"#;
+
 static RSA_JWK_FIXTURE: &str = r#"{
         "p": "6AQ4yHef17an_i5LQPHNIxzpH65xWOSf_qCB7q-lXyM",
         "kty": "RSA",
@@ -27,6 +38,20 @@ static RSA_JWK_FIXTURE: &str = r#"{
         "d": "Qdp8a8Df5TlMaaloXApNF_3eu8sLHNWbXdg70e5YVTAs0WUfaIf5c3n96RrDDAzmMEwgKnJ7A1NJ9Nlzz4Z0AQ",
         "e": "AQAB",
         "use": "enc",
+        "qi": "adhQHH8IGXFfLEMnZ5t_TeCp5zgSwQktJ2lmylxUG0M",
+        "dp": "qVnLiKeoSG_Olz17OGBGd4a2sqVFnrjh_51wuaQDdTk",
+        "dq": "GL_Ec6xYg2z1FRfyyGyU1lgf0BJFTZcfNI8ISIN5ssE",
+        "key_ops": ["wrapKey"],
+        "n": "pCzbcd9kjvg5rfGHdEMWnXo49zbB6FLQ-m0B0BvVp0aojVWYa0xujC-ZP7ZhxByPxyc2PazwFJJi9ivZ_ggRww"
+    }"#;
+
+static RSA_JWK_FIXTURE_OTHER_USE: &str = r#"{
+        "p": "6AQ4yHef17an_i5LQPHNIxzpH65xWOSf_qCB7q-lXyM",
+        "kty": "RSA",
+        "q": "tSVfpefCsf1iWmAs1zYvxdEsUiv0VMEuQBtbTijj_OE",
+        "d": "Qdp8a8Df5TlMaaloXApNF_3eu8sLHNWbXdg70e5YVTAs0WUfaIf5c3n96RrDDAzmMEwgKnJ7A1NJ9Nlzz4Z0AQ",
+        "e": "AQAB",
+        "use": "x509-svid",
         "qi": "adhQHH8IGXFfLEMnZ5t_TeCp5zgSwQktJ2lmylxUG0M",
         "dp": "qVnLiKeoSG_Olz17OGBGd4a2sqVFnrjh_51wuaQDdTk",
         "dq": "GL_Ec6xYg2z1FRfyyGyU1lgf0BJFTZcfNI8ISIN5ssE",
@@ -66,6 +91,37 @@ fn deserialize_es256() {
             key_id: Some("a key".into()),
             key_ops: KeyOps::empty(),
             key_use: Some(KeyUse::Encryption),
+            x5: Default::default(),
+        }
+    );
+}
+
+#[test]
+fn deserialize_es256_with_other_use() {
+    let jwk = JsonWebKey::from_str(P256_JWK_FIXTURE_OTHER_USE).unwrap();
+    assert_eq!(
+        jwk,
+        JsonWebKey {
+            key: Box::new(Key::EC {
+                // The parameters were decoded using a 10-liner Rust script.
+                curve: Curve::P256,
+                d: Some(ByteArray::from_slice(&[
+                    102, 130, 144, 246, 62, 29, 132, 128, 101, 49, 21, 107, 191, 228, 6, 240, 255,
+                    211, 246, 203, 173, 191, 127, 253, 229, 232, 168, 244, 203, 105, 128, 168
+                ])),
+                x: ByteArray::from_slice(&[
+                    64, 227, 7, 154, 255, 122, 181, 89, 73, 191, 235, 141, 170, 154, 231, 13, 34,
+                    136, 143, 144, 34, 45, 53, 202, 70, 137, 151, 98, 118, 175, 208, 221
+                ]),
+                y: ByteArray::from_slice(&[
+                    78, 54, 25, 160, 121, 220, 181, 171, 68, 19, 163, 66, 172, 169, 151, 65, 210,
+                    73, 62, 115, 115, 100, 69, 252, 156, 25, 153, 117, 237, 192, 99, 137
+                ])
+            }),
+            algorithm: Some(Algorithm::ES256),
+            key_id: Some("a key".into()),
+            key_ops: KeyOps::empty(),
+            key_use: Some(KeyUse::Custom("jwt-svid".into())),
             x5: Default::default(),
         }
     );
@@ -243,6 +299,80 @@ fn deserialize_rs256() {
             key_id: None,
             key_ops: KeyOps::WRAP_KEY,
             key_use: Some(KeyUse::Encryption),
+            x5: Default::default(),
+        }
+    );
+}
+
+#[test]
+fn deserialize_rs256_other_use() {
+    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE_OTHER_USE).unwrap();
+    assert_eq!(
+        jwk,
+        JsonWebKey {
+            key: Box::new(Key::RSA {
+                public: RsaPublic {
+                    e: PublicExponent,
+                    n: vec![
+                        164, 44, 219, 113, 223, 100, 142, 248, 57, 173, 241, 135, 116, 67, 22, 157,
+                        122, 56, 247, 54, 193, 232, 82, 208, 250, 109, 1, 208, 27, 213, 167, 70,
+                        168, 141, 85, 152, 107, 76, 110, 140, 47, 153, 63, 182, 97, 196, 28, 143,
+                        199, 39, 54, 61, 172, 240, 20, 146, 98, 246, 43, 217, 254, 8, 17, 195
+                    ]
+                        .into()
+                },
+                private: Some(RsaPrivate {
+                    d: vec![
+                        65, 218, 124, 107, 192, 223, 229, 57, 76, 105, 169, 104, 92, 10, 77, 23,
+                        253, 222, 187, 203, 11, 28, 213, 155, 93, 216, 59, 209, 238, 88, 85, 48,
+                        44, 209, 101, 31, 104, 135, 249, 115, 121, 253, 233, 26, 195, 12, 12, 230,
+                        48, 76, 32, 42, 114, 123, 3, 83, 73, 244, 217, 115, 207, 134, 116, 1
+                    ]
+                        .into(),
+                    p: Some(
+                        vec![
+                            232, 4, 56, 200, 119, 159, 215, 182, 167, 254, 46, 75, 64, 241, 205,
+                            35, 28, 233, 31, 174, 113, 88, 228, 159, 254, 160, 129, 238, 175, 165,
+                            95, 35
+                        ]
+                            .into()
+                    ),
+                    q: Some(
+                        vec![
+                            181, 37, 95, 165, 231, 194, 177, 253, 98, 90, 96, 44, 215, 54, 47, 197,
+                            209, 44, 82, 43, 244, 84, 193, 46, 64, 27, 91, 78, 40, 227, 252, 225
+                        ]
+                            .into()
+                    ),
+                    dp: Some(
+                        vec![
+                            169, 89, 203, 136, 167, 168, 72, 111, 206, 151, 61, 123, 56, 96, 70,
+                            119, 134, 182, 178, 165, 69, 158, 184, 225, 255, 157, 112, 185, 164, 3,
+                            117, 57
+                        ]
+                            .into()
+                    ),
+                    dq: Some(
+                        vec![
+                            24, 191, 196, 115, 172, 88, 131, 108, 245, 21, 23, 242, 200, 108, 148,
+                            214, 88, 31, 208, 18, 69, 77, 151, 31, 52, 143, 8, 72, 131, 121, 178,
+                            193
+                        ]
+                            .into()
+                    ),
+                    qi: Some(
+                        vec![
+                            105, 216, 80, 28, 127, 8, 25, 113, 95, 44, 67, 39, 103, 155, 127, 77,
+                            224, 169, 231, 56, 18, 193, 9, 45, 39, 105, 102, 202, 92, 84, 27, 67
+                        ]
+                            .into()
+                    )
+                })
+            }),
+            algorithm: None,
+            key_id: None,
+            key_ops: KeyOps::WRAP_KEY,
+            key_use: Some(KeyUse::Custom("x509-svid".into())),
             x5: Default::default(),
         }
     );
