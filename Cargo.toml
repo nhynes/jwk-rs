@@ -10,7 +10,7 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-base64        = "0.13"
+base64        = "0.21"
 bitflags      = "1.2"
 generic-array = "0.14"
 jsonwebtoken  = { version = "9.0",  optional = true }

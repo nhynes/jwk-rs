@@ -411,8 +411,9 @@ impl Key {
     /// If this key is asymmetric, encodes it as PKCS#8 with PEM armoring.
     #[cfg(feature = "pkcs-convert")]
     pub fn try_to_pem(&self) -> Result<String, ConversionError> {
+        use base64::{engine::general_purpose::STANDARD, Engine};
         use std::fmt::Write;
-        let der_b64 = base64::encode(self.try_to_der()?);
+        let der_b64 = STANDARD.encode(self.try_to_der()?);
         let key_ty = if self.is_private() {
             "PRIVATE"
         } else {
