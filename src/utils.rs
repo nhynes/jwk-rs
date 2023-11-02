@@ -1,19 +1,24 @@
+use base64::{
+    alphabet::URL_SAFE,
+    engine::{general_purpose::NO_PAD, GeneralPurpose},
+    Engine,
+};
 use serde::{
     de::{self, Deserialize, Deserializer},
     ser::{Serialize, Serializer},
 };
 use zeroize::Zeroizing;
 
-fn base64_config() -> base64::Config {
-    base64::Config::new(base64::CharacterSet::UrlSafe, false /* pad */)
+fn base64_config() -> GeneralPurpose {
+    GeneralPurpose::new(&URL_SAFE, NO_PAD)
 }
 
 pub(crate) fn base64_encode(bytes: impl AsRef<[u8]>) -> String {
-    base64::encode_config(bytes, base64_config())
+    base64_config().encode(bytes)
 }
 
 fn base64_decode(b64: impl AsRef<[u8]>) -> Result<Vec<u8>, base64::DecodeError> {
-    base64::decode_config(b64, base64_config())
+    base64_config().decode(b64)
 }
 
 pub(crate) mod serde_base64 {
