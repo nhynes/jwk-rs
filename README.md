@@ -10,7 +10,7 @@
 
 tl;dr: get keys into a format that can be used by other crates; be as safe as possible while doing so.
 
-- Serialization and deserialization of _Required_ and _Recommended_ key types (HS256, RS256, ES256)
+- Serialization and deserialization of _Required_ and _Recommended_ key types (HS256, HS384, HS512 RS256, RS384, RS512, ES256, ES384)
 - Conversion to PEM for interop with existing JWT libraries (e.g., [jsonwebtoken](https://crates.io/crates/jsonwebtoken))
 - Key generation (particularly useful for testing)
 
