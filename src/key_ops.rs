@@ -6,7 +6,7 @@ use serde::{
 macro_rules! impl_key_ops {
     ($(($key_op:ident, $const_name:ident, $i:literal)),+,) => {
         bitflags::bitflags! {
-            #[derive(Default)]
+            #[derive(Debug, Clone, PartialEq, Eq, Default)]
             pub struct KeyOps: u16 {
                 $(const $const_name = $i;)*
             }

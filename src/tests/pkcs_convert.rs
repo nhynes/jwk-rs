@@ -32,7 +32,7 @@ LTXKRomXYnav0N1ONhmgedy1q0QTo0KsqZdB0kk+c3NkRfycGZl17cBjiQ==
 
 #[test]
 fn rsa_private_to_pem() {
-    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    let jwk = JsonWebKey::from_str(RSA256_JWK_FIXTURE).unwrap();
     #[rustfmt::skip]
     assert_eq!(
         jwk.key.to_pem(),
@@ -52,7 +52,7 @@ J2lmylxUG0M=
 
 #[test]
 fn rsa_public_to_pem() {
-    let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
+    let jwk = JsonWebKey::from_str(RSA256_JWK_FIXTURE).unwrap();
     assert_eq!(
         jwk.key.to_public().unwrap().to_pem(),
         "-----BEGIN PUBLIC KEY-----
