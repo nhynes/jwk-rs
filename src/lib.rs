@@ -145,7 +145,7 @@ impl JsonWebKey {
     }
 
     pub fn set_algorithm(&mut self, alg: Algorithm) -> Result<(), Error> {
-        Self::validate_algorithm(alg, &*self.key)?;
+        Self::validate_algorithm(alg, &self.key)?;
         self.algorithm = Some(alg);
         Ok(())
     }
@@ -180,7 +180,7 @@ impl std::str::FromStr for JsonWebKey {
             Some(alg) => alg,
             None => return Ok(jwk),
         };
-        Self::validate_algorithm(alg, &*jwk.key).map(|_| jwk)
+        Self::validate_algorithm(alg, &jwk.key).map(|_| jwk)
     }
 }
 
@@ -337,7 +337,7 @@ impl Key {
                     Some(private_point) => {
                         pkcs8::write_private(oids, |writer: &mut DERWriterSeq<'_>| {
                             writer.next().write_i8(1); // version
-                            writer.next().write_bytes(&**private_point);
+                            writer.next().write_bytes(private_point);
                             // The following tagged value is optional. OpenSSL produces it,
                             // but many tools, including jwt.io and `jsonwebtoken`, don't like it,
                             // so we don't include it.
@@ -411,8 +411,9 @@ impl Key {
     /// If this key is asymmetric, encodes it as PKCS#8 with PEM armoring.
     #[cfg(feature = "pkcs-convert")]
     pub fn try_to_pem(&self) -> Result<String, ConversionError> {
+        use base64::{engine::general_purpose::STANDARD, Engine};
         use std::fmt::Write;
-        let der_b64 = base64::encode(self.try_to_der()?);
+        let der_b64 = STANDARD.encode(self.try_to_der()?);
         let key_ty = if self.is_private() {
             "PRIVATE"
         } else {
