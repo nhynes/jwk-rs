@@ -737,14 +737,14 @@ fn rs512_public_to_decoding_key_via_pem() {
 #[cfg(feature = "pkcs-convert")]
 #[test]
 fn oct_to_pem() {
-    let jwk = JsonWebKey::from_str(OCT_FIXTURE).unwrap();
+    let jwk = JsonWebKey::from_str(OCT_JWK_FIXTURE).unwrap();
     assert!(jwk.key.try_to_pem().is_err());
 }
 
 #[cfg(feature = "pkcs-convert")]
 #[test]
 fn oct_to_public() {
-    let jwk = JsonWebKey::from_str(OCT_FIXTURE).unwrap();
+    let jwk = JsonWebKey::from_str(OCT_JWK_FIXTURE).unwrap();
     assert!(jwk.key.to_public().is_none());
 }
 

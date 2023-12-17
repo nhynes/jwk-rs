@@ -246,7 +246,19 @@ impl Key {
         use serde::ser::{SerializeStruct, Serializer};
         let mut s = serde_json::Serializer::new(Vec::new());
         match self {
-            Self::EC { curve, x, y, .. } => {
+            Self::EC {
+                curve: curve @ Curve::P256 { x, y, .. },
+            } => {
+                let mut ss = s.serialize_struct("", 4)?;
+                ss.serialize_field("crv", curve.name())?;
+                ss.serialize_field("kty", "EC")?;
+                ss.serialize_field("x", x)?;
+                ss.serialize_field("y", y)?;
+                ss.end()?;
+            }
+            Self::EC {
+                curve: curve @ Curve::P384 { x, y, .. },
+            } => {
                 let mut ss = s.serialize_struct("", 4)?;
                 ss.serialize_field("crv", curve.name())?;
                 ss.serialize_field("kty", "EC")?;
@@ -342,7 +354,9 @@ impl Key {
         }
 
         Ok(match self {
-            Self::EC { d, x, y, .. } => {
+            Self::EC {
+                curve: Curve::P256 { d, x, y },
+            } => {
                 let ec_public_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 2, 1]);
                 let prime256v1_oid = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 3, 1, 7]);
                 let oids = &[Some(&ec_public_oid), Some(&prime256v1_oid)];
@@ -521,10 +535,11 @@ impl Key {
         let (x_bytes, y_bytes) = pk_bytes.split_at(32);
 
         Self::EC {
-            curve: Curve::P256,
-            d: Some(sk_scalar.to_bytes().into()),
-            x: ByteArray::from_slice(x_bytes),
-            y: ByteArray::from_slice(y_bytes),
+            curve: Curve::P256 {
+                d: Some(sk_scalar.to_bytes().into()),
+                x: ByteArray::from_slice(x_bytes),
+                y: ByteArray::from_slice(y_bytes),
+            },
         }
     }
 }
