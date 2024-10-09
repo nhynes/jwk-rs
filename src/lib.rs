@@ -637,7 +637,8 @@ const _IMPL_JWT_CONVERSIONS: () = {
                         .unwrap()
                 }
                 Self::RSA { .. } => {
-                    jwt::DecodingKey::from_rsa_pem(self.to_pem().as_bytes()).unwrap()
+                    jwt::DecodingKey::from_rsa_pem(self.to_public().unwrap().to_pem().as_bytes())
+                        .unwrap()
                 }
             }
         }
