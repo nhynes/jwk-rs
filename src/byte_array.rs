@@ -8,42 +8,42 @@ use zeroize::{Zeroize, Zeroizing};
 /// A zeroizing-on-drop container for a `[u8; N]` that deserializes from base64.
 #[derive(Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
-pub struct ByteArray<N: ArrayLength<u8>>(
+pub struct ByteArray<N: ArrayLength>(
     #[serde(serialize_with = "crate::utils::serde_base64::serialize")] GenericArray<u8, N>,
 );
 
-impl<N: ArrayLength<u8>> std::fmt::Debug for ByteArray<N> {
+impl<N: ArrayLength> std::fmt::Debug for ByteArray<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&crate::utils::base64_encode(&self.0))
     }
 }
 
-impl<N: ArrayLength<u8>, T: Into<GenericArray<u8, N>>> From<T> for ByteArray<N> {
+impl<N: ArrayLength, T: Into<GenericArray<u8, N>>> From<T> for ByteArray<N> {
     fn from(arr: T) -> Self {
         Self(arr.into())
     }
 }
 
-impl<N: ArrayLength<u8>> Drop for ByteArray<N> {
+impl<N: ArrayLength> Drop for ByteArray<N> {
     fn drop(&mut self) {
         Zeroize::zeroize(self.0.as_mut_slice())
     }
 }
 
-impl<N: ArrayLength<u8>> AsRef<[u8]> for ByteArray<N> {
+impl<N: ArrayLength> AsRef<[u8]> for ByteArray<N> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl<N: ArrayLength<u8>> std::ops::Deref for ByteArray<N> {
+impl<N: ArrayLength> std::ops::Deref for ByteArray<N> {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<N: ArrayLength<u8>> ByteArray<N> {
+impl<N: ArrayLength> ByteArray<N> {
     /// An unwrapping version of `try_from_slice`.
     pub fn from_slice(bytes: impl AsRef<[u8]>) -> Self {
         Self::try_from_slice(bytes).unwrap()
@@ -58,12 +58,19 @@ impl<N: ArrayLength<u8>> ByteArray<N> {
                 bytes.len()
             ))
         } else {
-            Ok(Self(GenericArray::clone_from_slice(bytes)))
+            let generic_array = GenericArray::try_from_slice(bytes).map_err(|_| {
+                format!(
+                    "expected {} bytes but got {}",
+                    N::USIZE,
+                    bytes.len()
+                )
+            })?;
+            Ok(Self(generic_array.clone()))
         }
     }
 }
 
-impl<'de, N: ArrayLength<u8>> Deserialize<'de> for ByteArray<N> {
+impl<'de, N: ArrayLength> Deserialize<'de> for ByteArray<N> {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let bytes = Zeroizing::new(crate::utils::serde_base64::deserialize(d)?);
         Self::try_from_slice(&*bytes).map_err(|_| {
