@@ -58,13 +58,8 @@ impl<N: ArrayLength> ByteArray<N> {
                 bytes.len()
             ))
         } else {
-            let generic_array = GenericArray::try_from_slice(bytes).map_err(|_| {
-                format!(
-                    "expected {} bytes but got {}",
-                    N::USIZE,
-                    bytes.len()
-                )
-            })?;
+            let generic_array = GenericArray::try_from_slice(bytes)
+                .map_err(|_| format!("expected {} bytes but got {}", N::USIZE, bytes.len()))?;
             Ok(Self(generic_array.clone()))
         }
     }
