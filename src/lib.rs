@@ -71,12 +71,11 @@ mod utils;
 
 use std::{borrow::Cow, fmt};
 
-use generic_array::typenum::U32;
-use serde::{Deserialize, Serialize};
-
 pub use byte_array::ByteArray;
 pub use byte_vec::ByteVec;
+use generic_array::typenum::U32;
 pub use key_ops::KeyOps;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JsonWebKey {
@@ -411,8 +410,9 @@ impl Key {
     /// If this key is asymmetric, encodes it as PKCS#8 with PEM armoring.
     #[cfg(feature = "pkcs-convert")]
     pub fn try_to_pem(&self) -> Result<String, ConversionError> {
-        use base64::Engine;
         use std::fmt::Write;
+
+        use base64::Engine;
         let der_b64 = base64::engine::general_purpose::STANDARD.encode(self.try_to_der()?);
         let key_ty = if self.is_private() {
             "PRIVATE"
@@ -457,7 +457,9 @@ impl Key {
     /// Used with the ES256 algorithm.
     #[cfg(feature = "generate")]
     pub fn generate_p256() -> Self {
-        use p256::elliptic_curve::{self as elliptic_curve, rand_core::OsRng, sec1::ToEncodedPoint};
+        use p256::elliptic_curve::{
+            self as elliptic_curve, rand_core::OsRng, sec1::ToEncodedPoint,
+        };
 
         let sk = elliptic_curve::SecretKey::random(&mut OsRng);
         let sk_scalar = p256::Scalar::from(&sk);
