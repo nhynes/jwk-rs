@@ -57,9 +57,9 @@
 //! ## Features
 //!
 //! * `convert` - enables `Key::{to_der, to_pem}`.
-//!               This pulls in the [yasna](https://crates.io/crates/yasna) crate.
+//!   This pulls in the [yasna](https://crates.io/crates/yasna) crate.
 //! * `generate` - enables `Key::{generate_p256, generate_symmetric}`.
-//!                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
+//!   This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
 //! * `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
 
 mod byte_array;
@@ -337,8 +337,7 @@ impl Key {
                     Some(private_point) => {
                         pkcs8::write_private(oids, |writer: &mut DERWriterSeq<'_>| {
                             writer.next().write_i8(1); // version
-                            #[allow(clippy::explicit_auto_deref)]
-                            writer.next().write_bytes(&**private_point);
+                            writer.next().write_bytes(private_point.as_ref());
                             // The following tagged value is optional. OpenSSL produces it,
                             // but many tools, including jwt.io and `jsonwebtoken`, don't like it,
                             // so we don't include it.
@@ -449,7 +448,8 @@ impl Key {
     pub fn generate_symmetric(num_bits: usize) -> Self {
         use rand::RngCore;
         let mut bytes = vec![0; num_bits / 8];
-        rand::thread_rng().fill_bytes(&mut bytes);
+        let mut rng = rand::rng();
+        rng.fill_bytes(&mut bytes);
         Self::Symmetric { key: bytes.into() }
     }
 
@@ -457,9 +457,9 @@ impl Key {
     /// Used with the ES256 algorithm.
     #[cfg(feature = "generate")]
     pub fn generate_p256() -> Self {
-        use p256::elliptic_curve::{self as elliptic_curve, sec1::ToEncodedPoint};
+        use p256::elliptic_curve::{self as elliptic_curve, rand_core::OsRng, sec1::ToEncodedPoint};
 
-        let sk = elliptic_curve::SecretKey::random(&mut rand::thread_rng());
+        let sk = elliptic_curve::SecretKey::random(&mut OsRng);
         let sk_scalar = p256::Scalar::from(&sk);
 
         let pk = p256::ProjectivePoint::GENERATOR * sk_scalar;
@@ -589,7 +589,7 @@ impl Algorithm {
 }
 
 #[cfg(feature = "jwt-convert")]
-const _IMPL_JWT_CONVERSIONS: () = {
+const _: () = {
     use jsonwebtoken as jwt;
 
     impl From<Algorithm> for jwt::Algorithm {

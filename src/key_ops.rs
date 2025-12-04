@@ -2,40 +2,13 @@ use serde::{
     de::{self, Deserialize, Deserializer},
     ser::{Serialize, SerializeSeq, Serializer},
 };
-use std::fmt::Debug;
 
 macro_rules! impl_key_ops {
     ($(($key_op:ident, $const_name:ident, $i:literal)),+,) => {
         bitflags::bitflags! {
-            #[derive(Default)]
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
             pub struct KeyOps: u16 {
                 $(const $const_name = $i;)*
-            }
-        }
-
-        impl Debug for KeyOps {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let mut debug = f.debug_set();
-                $(
-                    if self.contains(KeyOps::$const_name) {
-                        debug.entry(&stringify!($key_op));
-                    }
-                )+
-                debug.finish()
-            }
-        }
-
-        impl Clone for KeyOps {
-            fn clone(&self) -> Self {
-                KeyOps::from_bits_truncate(self.bits())
-            }
-        }
-
-        impl std::cmp::Eq for KeyOps {}
-
-        impl std::cmp::PartialEq for KeyOps {
-            fn eq(&self, other: &Self) -> bool {
-                self.bits() == other.bits()
             }
         }
 
@@ -97,19 +70,5 @@ mod tests {
         let ops = KeyOps::SIGN | KeyOps::DERIVE_BITS;
         let json = serde_json::to_string(&ops).unwrap();
         assert_eq!(json, r#"["sign","deriveBits"]"#)
-    }
-
-    #[test]
-    fn debug() {
-        let ops = KeyOps::SIGN | KeyOps::ENCRYPT | KeyOps::DERIVE_BITS;
-        let debug_str = format!("{:?}", ops);
-        assert_eq!(debug_str, r#"{"sign", "encrypt", "deriveBits"}"#);
-    }
-
-    #[test]
-    fn clone_eq() {
-        let ops = KeyOps::SIGN | KeyOps::VERIFY;
-        let cloned_ops = ops.clone();
-        assert_eq!(ops, cloned_ops);
     }
 }
