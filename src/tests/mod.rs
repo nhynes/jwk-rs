@@ -3,10 +3,9 @@ mod pkcs_convert;
 #[cfg(feature = "thumbprint")]
 mod thumbprint;
 
-use super::*;
-
 use std::str::FromStr;
 
+use super::*;
 use crate::byte_array::ByteArray;
 
 // Generated using https://mkjwk.org

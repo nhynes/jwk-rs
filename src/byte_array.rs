@@ -79,9 +79,9 @@ impl<'de, N: ArrayLength> Deserialize<'de> for ByteArray<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use generic_array::typenum::*;
+
+    use super::*;
 
     static BYTES: &[u8] = &[1, 2, 3, 4, 5, 6, 7];
     static BASE64_JSON: &str = "\"AQIDBAUGBw\"";
