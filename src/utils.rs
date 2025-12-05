@@ -29,9 +29,9 @@ pub(crate) mod serde_base64 {
 
     pub(crate) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
         let base64_str = Zeroizing::new(String::deserialize(d)?);
-        base64_decode(&*base64_str).map_err(|e| {
+        base64_decode(&*base64_str).map_err(|_e| {
             #[cfg(debug_assertions)]
-            let err_msg = e.to_string().to_lowercase();
+            let err_msg = _e.to_string().to_lowercase();
             #[cfg(not(debug_assertions))]
             let err_msg = "invalid base64";
             de::Error::custom(err_msg.strip_suffix('.').unwrap_or(&err_msg))
