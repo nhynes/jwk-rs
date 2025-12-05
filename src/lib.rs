@@ -58,7 +58,7 @@
 //!
 //! * `convert` - enables `Key::{to_der, to_pem}`.
 //!   This pulls in the [yasna](https://crates.io/crates/yasna) crate.
-//! * `generate` - enables `Key::{generate_p256, generate_symmetric}`.
+//! * `generate` - enables `Key::{generate_p256, try_generate_symmetric}`.
 //!   This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
 //! * `jsonwebtoken` - enables conversions to types in the [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.
 
@@ -444,12 +444,25 @@ impl Key {
     /// Generates a new symmetric key with the specified number of bits.
     /// Best used with one of the HS algorithms (e.g., HS256).
     #[cfg(feature = "generate")]
-    pub fn generate_symmetric(num_bits: usize) -> Self {
-        use rand::RngCore;
+    pub fn try_generate_symmetric(num_bits: usize) -> Result<Self, GenerateError> {
+        use rand::TryRngCore;
+
+        if !num_bits.is_multiple_of(8) {
+            return Err(GenerateError::NonByteMultiple(num_bits));
+        }
         let mut bytes = vec![0; num_bits / 8];
         let mut rng = rand::rng();
-        rng.fill_bytes(&mut bytes);
-        Self::Symmetric { key: bytes.into() }
+        rng.try_fill_bytes(&mut bytes)
+            .map_err(|e| GenerateError::Randomness(e.to_string()))?;
+        Ok(Self::Symmetric { key: bytes.into() })
+    }
+
+    /// Generates a new symmetric key with the specified number of bits.
+    /// Best used with one of the HS algorithms (e.g., HS256).
+    #[cfg(feature = "generate")]
+    #[deprecated(note = "use `try_generate_symmetric` instead")]
+    pub fn generate_symmetric(num_bits: usize) -> Self {
+        Self::try_generate_symmetric(num_bits).expect("invalid symmetric key size")
     }
 
     /// Generates a new EC keypair using the prime256 curve.
@@ -669,4 +682,14 @@ pub enum ConversionError {
     #[cfg(feature = "jwt-convert")]
     #[error("a public key cannot be converted to a `jsonwebtoken::EncodingKey`")]
     NotPrivate,
+}
+
+#[cfg(feature = "generate")]
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateError {
+    #[error("symmetric key size must be a multiple of 8 bits: {0} requested")]
+    NonByteMultiple(usize),
+
+    #[error("failed to generate random bytes: {0}")]
+    Randomness(String),
 }

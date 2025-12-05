@@ -68,7 +68,7 @@ jwt::decode::<TokenClaims>(&token, &my_jwk.key.to_decoding_key(), &validation).u
 
 * `pkcs-convert` - enables `Key::{to_der, to_pem}`.
                    This pulls in the [yasna](https://crates.io/crates/yasna) crate.
-* `generate` - enables `Key::{generate_p256, generate_symmetric}`.
+* `generate` - enables `Key::{generate_p256, try_generate_symmetric}`.
                This pulls in the [p256](https://crates.io/crates/p256) and [rand](https://crates.io/crates/rand) crates.
 * `jwt-convert` - enables conversions to types in the
                   [jsonwebtoken](https://crates.io/crates/jsonwebtoken) crate.

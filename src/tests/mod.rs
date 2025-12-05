@@ -306,10 +306,19 @@ fn mismatched_algorithm() {
 #[test]
 fn generate_oct() {
     let bits = 56;
-    match Key::generate_symmetric(bits) {
-        Key::Symmetric { key } if key.len() == 56 / 8 => {}
-        k => panic!("`generate_symmetric` generated {:?}", k),
+    match Key::try_generate_symmetric(bits).unwrap() {
+        Key::Symmetric { key } if key.len() == bits / 8 => {}
+        k => panic!("`try_generate_symmetric` generated {:?}", k),
     }
+}
+
+#[cfg(feature = "generate")]
+#[test]
+fn generate_oct_rejects_non_byte_multiple() {
+    assert!(matches!(
+        Key::try_generate_symmetric(57),
+        Err(GenerateError::NonByteMultiple(57))
+    ));
 }
 
 #[test]
