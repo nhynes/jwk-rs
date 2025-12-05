@@ -1,4 +1,3 @@
-use generic_array::{ArrayLength, GenericArray};
 use serde::{
     de::{self, Deserializer},
     Deserialize, Serialize,
@@ -6,44 +5,39 @@ use serde::{
 use zeroize::{Zeroize, Zeroizing};
 
 /// A zeroizing-on-drop container for a `[u8; N]` that deserializes from base64.
-#[derive(Clone, PartialEq, Eq, Serialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Zeroize)]
+#[zeroize(drop)]
 #[serde(transparent)]
-pub struct ByteArray<N: ArrayLength>(
-    #[serde(serialize_with = "crate::utils::serde_base64::serialize")] GenericArray<u8, N>,
+pub struct ByteArray<const N: usize>(
+    #[serde(serialize_with = "crate::utils::serde_base64::serialize")] [u8; N],
 );
 
-impl<N: ArrayLength> std::fmt::Debug for ByteArray<N> {
+impl<const N: usize> std::fmt::Debug for ByteArray<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&crate::utils::base64_encode(&self.0))
+        f.write_str(&crate::utils::base64_encode(self.as_ref()))
     }
 }
 
-impl<N: ArrayLength, T: Into<GenericArray<u8, N>>> From<T> for ByteArray<N> {
-    fn from(arr: T) -> Self {
-        Self(arr.into())
+impl<const N: usize> From<[u8; N]> for ByteArray<N> {
+    fn from(arr: [u8; N]) -> Self {
+        Self(arr)
     }
 }
 
-impl<N: ArrayLength> Drop for ByteArray<N> {
-    fn drop(&mut self) {
-        Zeroize::zeroize(self.0.as_mut_slice())
-    }
-}
-
-impl<N: ArrayLength> AsRef<[u8]> for ByteArray<N> {
+impl<const N: usize> AsRef<[u8]> for ByteArray<N> {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
 
-impl<N: ArrayLength> std::ops::Deref for ByteArray<N> {
+impl<const N: usize> std::ops::Deref for ByteArray<N> {
     type Target = [u8];
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<N: ArrayLength> ByteArray<N> {
+impl<const N: usize> ByteArray<N> {
     /// An unwrapping version of `try_from_slice`.
     pub fn from_slice(bytes: impl AsRef<[u8]>) -> Self {
         Self::try_from_slice(bytes).unwrap()
@@ -51,36 +45,27 @@ impl<N: ArrayLength> ByteArray<N> {
 
     pub fn try_from_slice(bytes: impl AsRef<[u8]>) -> Result<Self, String> {
         let bytes = bytes.as_ref();
-        if bytes.len() != N::USIZE {
-            Err(format!(
-                "expected {} bytes but got {}",
-                N::USIZE,
-                bytes.len()
-            ))
+        if bytes.len() != N {
+            Err(format!("expected {} bytes but got {}", N, bytes.len()))
         } else {
-            let generic_array = GenericArray::try_from_slice(bytes)
-                .map_err(|_| format!("expected {} bytes but got {}", N::USIZE, bytes.len()))?;
-            Ok(Self(generic_array.clone()))
+            let mut array = [0u8; N];
+            array.copy_from_slice(bytes);
+            Ok(Self(array))
         }
     }
 }
 
-impl<'de, N: ArrayLength> Deserialize<'de> for ByteArray<N> {
+impl<'de, const N: usize> Deserialize<'de> for ByteArray<N> {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let bytes = Zeroizing::new(crate::utils::serde_base64::deserialize(d)?);
         Self::try_from_slice(&*bytes).map_err(|_| {
-            de::Error::invalid_length(
-                bytes.len(),
-                &format!("{} base64-encoded bytes", N::USIZE).as_str(),
-            )
+            de::Error::invalid_length(bytes.len(), &format!("{} base64-encoded bytes", N).as_str())
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use generic_array::typenum::*;
-
     use super::*;
 
     static BYTES: &[u8] = &[1, 2, 3, 4, 5, 6, 7];
@@ -92,26 +77,26 @@ mod tests {
 
     #[test]
     fn test_serde_byte_array_good() {
-        let arr = ByteArray::<U7>::try_from_slice(BYTES).unwrap();
+        let arr = ByteArray::<7>::try_from_slice(BYTES).unwrap();
         let b64 = serde_json::to_string(&arr).unwrap();
         assert_eq!(b64, BASE64_JSON);
-        let bytes: ByteArray<U7> = serde_json::from_str(&b64).unwrap();
+        let bytes: ByteArray<7> = serde_json::from_str(&b64).unwrap();
         assert_eq!(bytes.as_ref(), BYTES);
     }
 
     #[test]
     fn test_serde_deserialize_byte_array_invalid() {
         let mut de = serde_json::Deserializer::from_str("\"Z\"");
-        ByteArray::<U0>::deserialize(&mut de).unwrap_err();
+        ByteArray::<0>::deserialize(&mut de).unwrap_err();
     }
 
     #[test]
     fn test_serde_base64_deserialize_array_long() {
-        ByteArray::<U6>::deserialize(&mut get_de()).unwrap_err();
+        ByteArray::<6>::deserialize(&mut get_de()).unwrap_err();
     }
 
     #[test]
     fn test_serde_base64_deserialize_array_short() {
-        ByteArray::<U8>::deserialize(&mut get_de()).unwrap_err();
+        ByteArray::<8>::deserialize(&mut get_de()).unwrap_err();
     }
 }

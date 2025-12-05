@@ -73,7 +73,6 @@ use std::{borrow::Cow, fmt};
 
 pub use byte_array::ByteArray;
 pub use byte_vec::ByteVec;
-use generic_array::typenum::U32;
 pub use key_ops::KeyOps;
 use serde::{Deserialize, Serialize};
 
@@ -202,11 +201,11 @@ pub enum Key {
         #[serde(rename = "crv")]
         curve: Curve,
         #[serde(skip_serializing_if = "Option::is_none")]
-        d: Option<ByteArray<U32>>,
+        d: Option<ByteArray<32>>,
         /// The curve point x coordinate.
-        x: ByteArray<U32>,
+        x: ByteArray<32>,
         /// The curve point y coordinate.
-        y: ByteArray<U32>,
+        y: ByteArray<32>,
     },
     /// An elliptic curve, as per [RFC 7518 §6.3](https://tools.ietf.org/html/rfc7518#section-6.3).
     /// See also: [RFC 3447](https://tools.ietf.org/html/rfc3447).
