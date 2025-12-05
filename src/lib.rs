@@ -73,6 +73,8 @@ use std::{borrow::Cow, fmt};
 
 pub use byte_array::ByteArray;
 pub use byte_vec::ByteVec;
+#[cfg(feature = "thumbprint")]
+pub use digest;
 pub use key_ops::KeyOps;
 use serde::{Deserialize, Serialize};
 
@@ -233,7 +235,7 @@ impl Key {
 
     /// The JWK thumbprint, as per [RFC 7638](https://datatracker.ietf.org/doc/html/rfc7638),
     /// using the provided hash function.
-    pub fn try_thumbprint_using_hasher<H: sha2::digest::Digest>(
+    pub fn try_thumbprint_using_hasher<H: digest::Digest>(
         &self,
     ) -> Result<String, serde_json::Error> {
         use serde::ser::{SerializeStruct, Serializer};

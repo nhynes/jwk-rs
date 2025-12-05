@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 base64        = "0.22.1"
 bitflags      = "2.10.0"
+digest        = { version = "0.10.7", optional = true }
 jsonwebtoken  = { version = "10.2", optional = true, features = ["rust_crypto"] }
 num-bigint    = { version = "0.4.6",  optional = true }
 p256          = { version = "0.13.2", optional = true, features = ["arithmetic"] }
@@ -27,7 +28,7 @@ zeroize       = { version = "1.8.2",  features = ["zeroize_derive"] }
 pkcs-convert = ["num-bigint", "yasna"]
 jwt-convert  = ["pkcs-convert", "jsonwebtoken"]
 generate     = ["p256", "rand"]
-thumbprint   = ["sha2"]
+thumbprint   = ["digest", "sha2"]
 
 [dev-dependencies]
 jsonwebtoken = { version = "10.2", features = ["rust_crypto"] }
