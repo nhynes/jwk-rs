@@ -150,8 +150,17 @@ impl JsonWebKey {
         Ok(())
     }
 
+    #[deprecated(note = "use `try_from_slice` which validates algorithm/key match")]
     pub fn from_slice(bytes: impl AsRef<[u8]>) -> Result<Self, Error> {
-        Ok(serde_json::from_slice(bytes.as_ref())?)
+        Self::try_from_slice(bytes)
+    }
+
+    pub fn try_from_slice(bytes: impl AsRef<[u8]>) -> Result<Self, Error> {
+        let jwk: Self = serde_json::from_slice(bytes.as_ref())?;
+        if let Some(alg) = jwk.algorithm {
+            Self::validate_algorithm(alg, &jwk.key)?;
+        }
+        Ok(jwk)
     }
 
     fn validate_algorithm(alg: Algorithm, key: &Key) -> Result<(), Error> {
@@ -174,13 +183,7 @@ impl JsonWebKey {
 impl std::str::FromStr for JsonWebKey {
     type Err = Error;
     fn from_str(json: &str) -> Result<Self, Self::Err> {
-        let jwk = Self::from_slice(json.as_bytes())?;
-
-        let alg = match jwk.algorithm {
-            Some(alg) => alg,
-            None => return Ok(jwk),
-        };
-        Self::validate_algorithm(alg, &jwk.key).map(|_| jwk)
+        Self::try_from_slice(json.as_bytes())
     }
 }
 

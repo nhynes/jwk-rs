@@ -164,6 +164,17 @@ fn serialize_hs256() {
 }
 
 #[test]
+fn deserialize_validates_algorithm_on_slice() {
+    let jwk_str = r#"{
+        "kty": "oct",
+        "k": "tAON6Q",
+        "alg": "ES256"
+    }"#;
+    let err = JsonWebKey::try_from_slice(jwk_str.as_bytes()).unwrap_err();
+    assert!(matches!(err, Error::MismatchedAlgorithm));
+}
+
+#[test]
 fn deserialize_rs256() {
     let jwk = JsonWebKey::from_str(RSA_JWK_FIXTURE).unwrap();
     assert_eq!(
