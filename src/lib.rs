@@ -450,7 +450,7 @@ impl Key {
     /// Best used with one of the HS algorithms (e.g., HS256).
     #[cfg(feature = "generate")]
     pub fn try_generate_symmetric(num_bits: usize) -> Result<Self, GenerateError> {
-        use rand::TryRngCore;
+        use rand::TryRng as _;
 
         if !num_bits.is_multiple_of(8) {
             return Err(GenerateError::NonByteMultiple(num_bits));
