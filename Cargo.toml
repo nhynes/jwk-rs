@@ -10,7 +10,7 @@ license = "MIT"
 edition = "2021"
 
 [dependencies]
-base64        = "0.22.1"
+base64        = "0.23.1"
 bitflags      = "2.10.0"
 digest        = { version = "0.10.7", optional = true }
 jsonwebtoken  = { version = "10.2", optional = true, features = ["rust_crypto"] }
