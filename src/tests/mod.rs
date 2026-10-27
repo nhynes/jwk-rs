@@ -158,7 +158,8 @@ fn generate_p256() {
         exp: usize,
     }
 
-    let mut the_jwk = JsonWebKey::new(Key::generate_p256());
+    let key = Key::generate_p256().unwrap();
+    let mut the_jwk = JsonWebKey::new(key);
     the_jwk.set_algorithm(Algorithm::ES256).unwrap();
 
     let encoding_key = jwt::EncodingKey::from_ec_der(&the_jwk.key.to_der());

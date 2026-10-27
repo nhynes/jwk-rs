@@ -36,7 +36,7 @@
 //!     exp: usize,
 //! }
 //!
-//! let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256());
+//! let mut my_jwk = jwk::JsonWebKey::new(jwk::Key::generate_p256().unwrap());
 //! my_jwk.set_algorithm(jwk::Algorithm::ES256);
 //!
 //! let alg: jwt::Algorithm = my_jwk.algorithm.unwrap().into();
@@ -450,7 +450,7 @@ impl Key {
     /// Best used with one of the HS algorithms (e.g., HS256).
     #[cfg(feature = "generate")]
     pub fn try_generate_symmetric(num_bits: usize) -> Result<Self, GenerateError> {
-        use rand::TryRngCore;
+        use rand::TryRng as _;
 
         if !num_bits.is_multiple_of(8) {
             return Err(GenerateError::NonByteMultiple(num_bits));
@@ -473,27 +473,26 @@ impl Key {
     /// Generates a new EC keypair using the prime256 curve.
     /// Used with the ES256 algorithm.
     #[cfg(feature = "generate")]
-    pub fn generate_p256() -> Self {
-        use p256::elliptic_curve::{
-            self as elliptic_curve, rand_core::OsRng, sec1::ToEncodedPoint,
-        };
+    pub fn generate_p256() -> Result<Self, rand::rngs::SysError> {
+        use p256::elliptic_curve::{self as elliptic_curve, sec1::ToSec1Point as _, Generate as _};
+        use rand::rngs::SysRng;
 
-        let sk = elliptic_curve::SecretKey::random(&mut OsRng);
+        let sk = elliptic_curve::SecretKey::try_generate_from_rng(&mut SysRng)?;
         let sk_scalar = p256::Scalar::from(&sk);
 
         let pk = p256::ProjectivePoint::GENERATOR * sk_scalar;
         let pk_bytes = &pk
             .to_affine()
-            .to_encoded_point(false /* compress */)
+            .to_sec1_point(false /* compress */)
             .to_bytes()[1..];
         let (x_bytes, y_bytes) = pk_bytes.split_at(32);
 
-        Self::EC {
+        Ok(Self::EC {
             curve: Curve::P256,
             d: Some(ByteArray::from_slice(sk_scalar.to_bytes())),
             x: ByteArray::from_slice(x_bytes),
             y: ByteArray::from_slice(y_bytes),
-        }
+        })
     }
 }
 
